@@ -1,0 +1,11 @@
+# reference documents and media kept outside the repo
+*.pptx
+*.docx
+*.xlsx
+*.pdf
+*.png
+# e2e test artifacts
+tests/e2e/profile/
+tests/e2e/results.json
+tests/e2e/evidence.pdf
+node_modules/
