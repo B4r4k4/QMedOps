@@ -59,7 +59,7 @@ Q.ago = v => { const d = Q.d(v), m = Math.round((Q.now() - d) / 6e4);
   return Q.fDate(d); };
 Q.fSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
 
-/* ---------- storage (IndexedDB with in-memory fallback) ---------- */
+/* ---------- storage: SQLite server (when served over http) → IndexedDB → memory ---------- */
 const COLS = ['users','depts','types','incidents','rca','capa','kpis','kpiValues','standards','devices','maint','audit','comments'];
 Q.COLS = COLS;
 const DBN = 'salamah-qmedops', VER = 1;
@@ -76,9 +76,20 @@ const kvPut = (k, v) => req(idb.transaction('kv', 'readwrite').objectStore('kv')
 const memFiles = {};
 const timers = {};
 
+/* server API (same origin); writes go through one ordered queue */
+const API = /^https?:$/.test(location.protocol) ? 'api' : null;
+const call = async (method, path, body, headers = {}) => {
+  const isJSON = body !== undefined && !(body instanceof Blob);
+  const r = await fetch(`${API}${path}`, {method, cache: 'no-store', headers: isJSON ? Object.assign({'Content-Type': 'application/json'}, headers) : headers, body: isJSON ? JSON.stringify(body) : body});
+  if (!r.ok && r.status !== 409 && r.status !== 404) throw new Error(`${method} ${path}: ${r.status}`);
+  return r;
+};
+const newMeta = () => ({version: 1, bilingual: 1, seededAt: Q.iso(Q.now())});
+
 Q.db = {
-  data: {}, persistent: false,
+  data: {}, persistent: false, remote: false, rev: 0, epoch: 0, prefs: {}, queue: Promise.resolve(), inflight: {}, acked: {},
   async init() {
+    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store'}); if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
     try { idb = await openIDB(); this.persistent = true; } catch (e) { idb = null; }
     let meta = null;
     if (idb) { try { meta = await kvGet('meta'); } catch (e) { meta = null; } }
@@ -89,23 +100,82 @@ Q.db = {
       if (!meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); meta.bilingual = 1; await this.flushAll(); }
     } else {
       Q.seed(this.data);
-      this.data.meta = {version: 1, bilingual: 1, seededAt: Q.iso(Q.now())};
+      this.data.meta = newMeta();
       await this.flushAll();
     }
   },
+  /* remote: load a snapshot; an empty database is seeded once by the first client */
+  async load(d) {
+    if (d.empty) { const fresh = {}; Q.seed(fresh); fresh.meta = newMeta(); await call('POST', '/import', Object.assign(this.pack(fresh), {meta: fresh.meta})); d = await (await call('GET', '/data')).json(); }
+    COLS.forEach(c => this.data[c] = d[c] || []);
+    this.data.settings = Object.assign(Q.defaultSettings(), d.settings || {}); this.data.meta = d.meta || newMeta();
+    this.prefs = d.prefs || {}; this.rev = d.rev; this.epoch = d.epoch;
+    if (!this.data.meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); this.data.meta.bilingual = 1; await this.flushAll(); }
+  },
+  pack(src) { const o = {settings: src.settings}; COLS.forEach(c => o[c] = src[c] || []); return o; },
+  /* ordered write to the server; failures surface as a toast */
+  send(key, method, path, body, headers) {
+    this.inflight[key] = (this.inflight[key] || 0) + 1;
+    this.queue = this.queue.then(() => call(method, path, body, headers)).then(async r => { const j = await r.json().catch(() => ({})); if (j.rev) this.acked[key] = j.rev; })
+      .catch(() => Q.toast(L('تعذّر الحفظ في قاعدة البيانات', 'Could not save to the database'), 'err'))
+      .finally(() => { if (!--this.inflight[key]) delete this.inflight[key]; });
+    return this.queue;
+  },
+  /* pull changes made by other users every few seconds */
+  sync() {
+    const tick = async () => {
+      if (Object.keys(this.inflight).length) return;
+      try {
+        const r = await (await call('GET', `/changes?since=${this.rev}`)).json();
+        if (r.epoch !== this.epoch) { await this.load(await (await call('GET', '/data')).json()); return Q.refresh(); }
+        let changed = false;
+        const skip = k => this.inflight[k] || (this.acked[k] || 0) > r.rev;
+        r.docs.forEach(({col, doc}) => { const k = col + '|' + doc.id; if (skip(k)) return; const a = this.all(col), i = a.findIndex(x => x.id === doc.id);
+          if (i < 0) { a.push(doc); changed = true; } else if (JSON.stringify(a[i]) !== JSON.stringify(doc)) { a[i] = doc; changed = true; } });
+        r.deleted.forEach(({col, id}) => { if (skip(col + '|' + id)) return; const a = this.all(col), i = a.findIndex(x => x.id === id); if (i >= 0) { a.splice(i, 1); changed = true; } });
+        Object.entries(r.prefs).forEach(([k, v]) => { if (!skip('pref|' + k) && JSON.stringify(this.prefs[k]) !== JSON.stringify(v)) { this.prefs[k] = v; changed = true; } });
+        if (r.settings && !skip('settings') && JSON.stringify(r.settings) !== JSON.stringify(this.data.settings)) { this.data.settings = Object.assign(Q.defaultSettings(), r.settings); changed = true; }
+        this.rev = r.rev;
+        if (changed) Q.refresh();
+      } catch (e) { /* offline for a moment: retry on next tick */ }
+    };
+    this.tick = tick;
+    setInterval(tick, 8000);
+  },
   all(c) { return this.data[c] || (this.data[c] = []); },
   get(c, id) { return this.all(c).find(x => x.id === id) || null; },
-  put(c, o) { const a = this.all(c), i = a.findIndex(x => x.id === o.id); if (i >= 0) a[i] = o; else a.push(o); this.save(c); return o; },
-  del(c, id) { const a = this.all(c), i = a.findIndex(x => x.id === id); if (i >= 0) a.splice(i, 1); this.save(c); },
-  save(c) { if (!idb) return; clearTimeout(timers[c]); timers[c] = setTimeout(() => { kvPut(c, this.data[c]).catch(() => Q.toast(L('تعذّر حفظ البيانات', 'Could not save data'), 'err')); }, 120); },
-  async flushAll() { if (!idb) return; for (const c of [...COLS, 'settings', 'meta']) { await kvPut(c, this.data[c]); } },
-  async putFile(id, blob) { if (idb) await req(idb.transaction('files', 'readwrite').objectStore('files').put(blob, id)); else memFiles[id] = blob; },
-  async getFile(id) { if (idb) return req(idb.transaction('files').objectStore('files').get(id)); return memFiles[id]; },
-  async delFile(id) { if (idb) await req(idb.transaction('files', 'readwrite').objectStore('files').delete(id)); else delete memFiles[id]; },
+  put(c, o) { const a = this.all(c), i = a.findIndex(x => x.id === o.id); if (i >= 0) a[i] = o; else a.push(o);
+    if (this.remote) this.send(c + '|' + o.id, 'PUT', `/c/${c}/${encodeURIComponent(o.id)}`, o); else this.save(c); return o; },
+  del(c, id) { const a = this.all(c), i = a.findIndex(x => x.id === id); if (i >= 0) a.splice(i, 1);
+    if (this.remote) this.send(c + '|' + id, 'DELETE', `/c/${c}/${encodeURIComponent(id)}`); else this.save(c); },
+  save(c) {
+    if (this.remote) { if (c === 'settings') this.send('settings', 'PUT', '/settings', this.data.settings); else this.all(c).forEach(o => this.send(c + '|' + o.id, 'PUT', `/c/${c}/${encodeURIComponent(o.id)}`, o)); return; }
+    if (!idb) return; clearTimeout(timers[c]); timers[c] = setTimeout(() => { kvPut(c, this.data[c]).catch(() => Q.toast(L('تعذّر حفظ البيانات', 'Could not save data'), 'err')); }, 120); },
+  async flushAll(opts = {}) {
+    if (this.remote) { await this.queue; await call('POST', '/import?force=1', Object.assign(this.pack(this.data), {meta: this.data.meta}, opts)); const d = await (await call('GET', '/data')).json(); this.rev = d.rev; this.epoch = d.epoch; this.prefs = d.prefs || {}; return; }
+    if (!idb) return; for (const c of [...COLS, 'settings', 'meta']) { await kvPut(c, this.data[c]); } },
+  async putFile(id, blob) {
+    if (this.remote) return this.send('file|' + id, 'PUT', `/files/${encodeURIComponent(id)}`, blob, {'Content-Type': blob.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(blob.name || '')});
+    if (idb) await req(idb.transaction('files', 'readwrite').objectStore('files').put(blob, id)); else memFiles[id] = blob; },
+  async getFile(id) {
+    if (this.remote) { await this.queue; const r = await call('GET', `/files/${encodeURIComponent(id)}`); return r.ok ? r.blob() : undefined; }
+    if (idb) return req(idb.transaction('files').objectStore('files').get(id)); return memFiles[id]; },
+  async delFile(id) {
+    if (this.remote) return this.send('file|' + id, 'DELETE', `/files/${encodeURIComponent(id)}`);
+    if (idb) await req(idb.transaction('files', 'readwrite').objectStore('files').delete(id)); else delete memFiles[id]; },
   export() { const o = {app: 'salamah-qmedops', exportedAt: Q.iso(Q.now()), settings: this.data.settings}; COLS.forEach(c => o[c] = this.data[c]); return o; },
   async import(o) { if (!o || o.app !== 'salamah-qmedops') throw new Error('bad file'); COLS.forEach(c => this.data[c] = Array.isArray(o[c]) ? o[c] : []); this.data.settings = Object.assign(Q.defaultSettings(), o.settings || {}); if (Q.bilingualize) Q.bilingualize(this.data); await this.flushAll(); },
-  async reset() { if (idb) { await req(idb.transaction('kv', 'readwrite').objectStore('kv').clear()); await req(idb.transaction('files', 'readwrite').objectStore('files').clear()); } this.data = {}; Q.seed(this.data); this.data.meta = {version: 1, bilingual: 1, seededAt: Q.iso(Q.now())}; await this.flushAll(); }
+  async reset() {
+    if (!this.remote && idb) { await req(idb.transaction('kv', 'readwrite').objectStore('kv').clear()); await req(idb.transaction('files', 'readwrite').objectStore('files').clear()); }
+    this.data = {}; Q.seed(this.data); this.data.meta = newMeta(); await this.flushAll({resetPrefs: true, resetFiles: true}); }
 };
+/* per-user state that follows the user across devices when the server is used (e.g. seen notifications) */
+Q.upref = {
+  get(k, d) { if (!Q.me) return d; if (Q.db.remote) { const v = Q.db.prefs[`${Q.me.id}|${k}`]; return v === undefined ? d : v; } return Q.pref.get(`${k}:${Q.me.id}`, d); },
+  set(k, v) { if (!Q.me) return; if (Q.db.remote) { const key = `${Q.me.id}|${k}`; Q.db.prefs[key] = v; Q.db.send('pref|' + key, 'PUT', `/prefs/${encodeURIComponent(Q.me.id)}/${encodeURIComponent(k)}`, {value: v}); } else Q.pref.set(`${k}:${Q.me.id}`, v); }
+};
+/* re-render after background changes, unless the user is in the middle of typing or a dialog */
+Q.refresh = () => { if (Q.me && Q.render && !document.querySelector('#modal').open && !document.activeElement.matches('input,textarea,select')) Q.render(); };
 Q.S = () => Q.db.data.settings;
 Q.defaultSettings = () => ({
   facility: {ar: 'مستشفى السلام التخصصي', en: 'Al Salam Specialist Hospital'},

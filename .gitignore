@@ -4,6 +4,11 @@
 *.xlsx
 *.pdf
 *.png
+# SQLite database (contains live data)
+server/data/
+*.db
+*.db-wal
+*.db-shm
 # e2e test artifacts
 tests/e2e/profile/
 tests/e2e/results.json

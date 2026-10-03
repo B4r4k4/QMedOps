@@ -39,20 +39,20 @@ a.btn{text-decoration:none}
 @media (max-width:1080px){.me-top{display:block}}
 /* stats as links */
 a.stat{color:inherit;text-decoration:none}
-a.stat:hover{border-color:#c9d6d1}
+a.stat:hover{border-color:#c2d6d8}
 .stat .sub .track{margin-top:4px}
 .nicu > a{padding:14px 18px;border-inline-start:1px solid var(--line-2);color:inherit;text-decoration:none;display:block}
 .nicu > a:first-child{border-inline-start:0}
 .nicu > a:hover{background:var(--sunken)}
 a.ind,a.std{color:inherit;text-decoration:none}
-a.ind:hover,a.std:hover{border-color:#c3d2cc}
+a.ind:hover,a.std:hover{border-color:#bdd3d5}
 .pill{font-style:normal;background:rgba(255,255,255,.25);border-radius:9px;padding:0 6px;font-size:11.5px}
 
 /* crumbs & tabs */
 .crumbs{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
 .crumbs a{color:var(--muted);text-decoration:none}
 .crumbs a:hover{color:var(--brand-600)}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
 .tabs button,.tabs a{border:0;background:none;padding:9px 12px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;text-decoration:none}
 .tabs .on{color:var(--ink);font-weight:600;border-bottom-color:var(--brand)}
 
@@ -67,7 +67,7 @@ a.ind:hover,a.std:hover{border-color:#c3d2cc}
 .next > div{flex:1}
 .next.ok{background:var(--brand-50);border-color:var(--brand-100)}
 .flow.four{grid-template-columns:repeat(4,1fr)}
-.act-card{margin-bottom:16px;border-color:#bcd8cd;box-shadow:0 0 0 3px var(--brand-50)}
+.act-card{margin-bottom:16px;border-color:#b5d9dd;box-shadow:0 0 0 3px var(--brand-50)}
 .act-card .card-h h3{color:var(--brand-600)}
 .form-actions{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .form-actions .muted{margin-inline-end:auto;font-size:12.5px}
@@ -101,7 +101,7 @@ a.ind:hover,a.std:hover{border-color:#c3d2cc}
 .people li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;font-size:13px}
 .people small{color:var(--muted);font-size:11.5px}
 .meet{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:var(--r-sm);background:var(--amber-50);color:#5f4400}
-.meet.ok{background:var(--brand-50);color:#2f5a4d}
+.meet.ok{background:var(--brand-50);color:#1d5a61}
 .meet > div{flex:1}
 .meet b{display:block;font-size:13px}
 .meet small{font-size:12px}
@@ -344,3 +344,10 @@ tr.click td{transition:background-color .15s var(--ease)}
 @keyframes q-pop{from{opacity:0;transform:translateY(6px) scale(.985)}}
 @keyframes q-fade{from{opacity:0}}
 @keyframes q-drop{from{opacity:0;transform:translateY(-4px)}}
+
+/* MedOps logo mark */
+.brand svg.logo{width:38px;height:38px}
+.logo-tile{width:46px;height:46px;flex:none;display:grid;place-items:center;background:#fff;border-radius:var(--r);box-shadow:0 6px 18px -6px rgba(0,0,0,.35)}
+.login-brand .brand .logo-tile svg{width:36px;height:36px}
+@media (max-width:1080px){.side .brand svg.logo{width:34px;height:34px}}
+@media (max-width:720px){.logo-tile{width:40px;height:40px}.login-brand .brand .logo-tile svg{width:30px;height:30px}}

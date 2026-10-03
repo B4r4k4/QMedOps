@@ -1,0 +1,12 @@
+{
+  "name": "salamah-qmedops",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Quality and patient-safety operations platform with a shared SQLite database",
+  "type": "module",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node server/server.mjs",
+    "test": "node tests/e2e/run.mjs"
+  }
+}

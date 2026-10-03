@@ -20,11 +20,11 @@ Q.home = () => Q.can('dashboard') ? '#/dashboard' : '#/tasks';
 
 const NAV = [
   {id: 'dashboard', icon: 'grid', t: ['مركز العمليات', 'Operations center'], perm: 'dashboard'},
-  {id: 'tasks', icon: 'inbox', t: ['مهامي', 'My tasks'], badge: () => Q.tasks().length},
+  {id: 'tasks', icon: 'inbox', t: ['مهامي', 'My tasks'], badge: () => Q.tasks().map(taskKey)},
   {sep: ['دورة الحدث', 'Event lifecycle']},
-  {id: 'incidents', icon: 'report', t: ['بلاغات السلامة', 'Safety reports'], badge: () => Q.visibleIncidents().filter(x => x.stage !== 'closed').length},
+  {id: 'incidents', icon: 'report', t: ['بلاغات السلامة', 'Safety reports'], badge: () => Q.visibleIncidents().filter(x => x.stage !== 'closed').map(x => x.id)},
   {id: 'rca', icon: 'search', t: ['التحقيق و RCA', 'Investigations & RCA'], perm: 'rca.view'},
-  {id: 'capa', icon: 'check-square', t: ['الإجراءات التصحيحية', 'Corrective actions'], perm: 'capa.view', badge: () => Q.db.all('capa').filter(c => ['open', 'progress'].includes(c.status) && new Date(c.due) < Q.now()).length, warn: true},
+  {id: 'capa', icon: 'check-square', t: ['الإجراءات التصحيحية', 'Corrective actions'], perm: 'capa.view', badge: () => Q.db.all('capa').filter(c => ['open', 'progress'].includes(c.status) && new Date(c.due) < Q.now() && Q.canSeeCAPA(c)).map(c => c.id), warn: true},
   {sep: ['الأداء والامتثال', 'Performance & compliance']},
   {id: 'indicators', icon: 'pulse', t: ['المؤشرات', 'Indicators'], perm: 'kpi.view'},
   {id: 'cbahi', icon: 'shield', t: ['جاهزية CBAHI', 'CBAHI readiness'], perm: 'cbahi.view'},
@@ -36,17 +36,25 @@ const NAV = [
 
 Q.visibleIncidents = () => Q.db.all('incidents').filter(x => Q.canSeeIncident(x));
 
+/* side badges count items not yet seen; opening a section marks its current items as seen */
+function navBadge(n, cur) {
+  if (!n.badge) return 0;
+  const keys = n.badge(), seen = Q.upref.get('navSeen', {});
+  if (cur === n.id) { if (JSON.stringify(seen[n.id]) !== JSON.stringify(keys)) Q.upref.set('navSeen', Object.assign({}, seen, {[n.id]: keys})); return 0; }
+  const old = seen[n.id] || [];
+  return keys.filter(k => !old.includes(k)).length;
+}
 function renderSide() {
   const cur = Q.parseHash().name;
   const items = NAV.filter(n => !n.perm || Q.can(n.perm));
   const cleaned = items.filter((n, i) => !(n.sep && (!items[i + 1] || items[i + 1].sep)));
   $('#side').innerHTML = `
     <a class="brand" href="${Q.home()}">
-      <svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="#0a6f58"/><path d="M17 9v16M9 17h16" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><circle cx="25.5" cy="8.5" r="3" fill="#8fd8bf"/></svg>
+      <svg class="logo" aria-hidden="true"><use href="#logo-mark"/></svg>
       <div><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></div>
     </a>
     <nav class="nav" aria-label="${L('التنقل الرئيسي', 'Main navigation')}">
-      ${cleaned.map(n => n.sep ? `<div class="nav-label">${T(n.sep)}</div>` : (() => { const b = n.badge ? n.badge() : 0; return `<a href="#/${n.id}" class="${cur === n.id ? 'on' : ''}" aria-label="${T(n.t)}" ${cur === n.id ? 'aria-current="page"' : ''}>${ic(n.icon)}<span class="lbl">${T(n.t)}</span>${b ? `<span class="count ${n.warn ? 'warn' : ''}">${b}</span>` : ''}</a>`; })()).join('')}
+      ${cleaned.map(n => n.sep ? `<div class="nav-label">${T(n.sep)}</div>` : (() => { const b = navBadge(n, cur); return `<a href="#/${n.id}" class="${cur === n.id ? 'on' : ''}" aria-label="${T(n.t)}" ${cur === n.id ? 'aria-current="page"' : ''}>${ic(n.icon)}<span class="lbl">${T(n.t)}</span>${b ? `<span class="count ${n.warn ? 'warn' : ''}">${b}</span>` : ''}</a>`; })()).join('')}
     </nav>
     <div class="side-foot">
       ${!Q.db.persistent ? `<div class="integ warn-box">${ic('alert', 'sm')}<div><span>${L('التخزين غير متاح', 'Storage unavailable')}</span><small>${L('لن تُحفظ التغييرات بعد الإغلاق', 'Changes will not persist')}</small></div></div>` : ''}
@@ -54,8 +62,11 @@ function renderSide() {
     </div>`;
 }
 
+/* bell badge: urgent tasks (due within a day) the user has not seen since last opening the bell */
+const taskKey = t => `${t.kind}|${t.ref}|${t.what[1]}`;
 function renderTop(title) {
-  const n = Q.tasks().filter(t => t.due && (new Date(t.due) < Q.add(Q.now(), Q.DAY))).length;
+  const seen = Q.upref.get('notifSeen', []);
+  const n = Q.tasks().filter(t => t.due && (new Date(t.due) < Q.add(Q.now(), Q.DAY)) && !seen.includes(taskKey(t))).length;
   $('#top').innerHTML = `
     <div class="ttl"><small>${Q.fDay(Q.now())} · ${esc(T(Q.S().facility))}</small><h1 id="page-title">${title}</h1></div>
     <form class="gsearch" data-gsearch role="search"><span>${ic('search', 'sm')}</span><input type="search" name="q" placeholder="${L('ابحث برقم بلاغ أو إجراء أو جهاز', 'Search report, action or device ID')}" aria-label="${L('بحث', 'Search')}"></form>
@@ -104,7 +115,7 @@ function renderLogin() {
   $('#login').innerHTML = `
   <div class="login">
     <aside class="login-brand">
-      <div class="brand big"><svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="#fff"/><path d="M17 9v16M9 17h16" stroke="#0a6f58" stroke-width="3.4" stroke-linecap="round"/><circle cx="25.5" cy="8.5" r="3" fill="#8fd8bf"/></svg><div><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></div></div>
+      <div class="brand big"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><div><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></div></div>
       <div class="lb-copy">
         <h2>${L('من البلاغ إلى التحسين، في مسار واحد.', 'From report to improvement, in one flow.')}</h2>
         <p>${L('منصة الجودة وسلامة المرضى: بلاغات، تحقيق، إجراءات تصحيحية، ومؤشرات أداء في مكان واحد.', 'Quality and patient safety platform: reports, investigations, corrective actions and indicators in one place.')}</p>
@@ -152,7 +163,9 @@ Q.closePop = () => { const p = $('#pop'); if (p) p.hidden = true; };
 
 Q.act('notifs', el => {
   if (!$('#pop').hidden && $('#pop')._anchor === el) return Q.closePop();
-  const ts = Q.tasks().slice(0, 7);
+  const all = Q.tasks(), ts = all.slice(0, 7);
+  Q.upref.set('notifSeen', all.map(taskKey)); // opening the bell marks everything current as seen
+  const b = $('.badge', el); if (b) b.remove();
   Q.openPop(el, `<h4>${L('ما يحتاج انتباهك', 'Needs your attention')}<a class="btn-g" href="#/tasks" style="font-size:12px">${L('كل المهام', 'All tasks')}</a></h4>
     <ul>${ts.length ? ts.map(t => { const r = t.due ? Q.rel(t.due) : null; return `<li><a href="${t.link}"><span class="pi ${r && r.late ? 'crit' : t.kind === 'incident' ? 'med' : 'info'}">${ic(TASK_ICON[t.kind], 'sm')}</span><div><b>${T(t.what)} · <span class="ltr">${esc(t.ref)}</span></b><small>${esc(t.sub || '')}${r ? ` · <span class="due ${r.cls}">${r.txt}</span>` : ''}</small></div></a></li>`; }).join('') : `<li class="muted" style="padding:16px">${L('لا توجد مهام معلقة.', 'Nothing pending.')}</li>`}</ul>`);
 });
@@ -358,6 +371,6 @@ Q.boot = async () => {
   const sid = Q.pref.get('session', null);
   if (sid && Q.user(sid) && Q.user(sid).active !== false) Q.me = Q.user(sid);
   Q.render();
-  setInterval(() => { if (Q.me && !$('#modal').open && !document.activeElement.matches('input,textarea,select')) Q.render(); }, 5 * 60 * 1000);
+  setInterval(Q.refresh, 5 * 60 * 1000);
 };
 })();

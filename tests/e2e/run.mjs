@@ -6,7 +6,7 @@ import {dirname, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const DIR = dirname(fileURLToPath(import.meta.url)).replace(/\\/g, '/');
-const APP = pathToFileURL(resolve(DIR, '../../index.html')).href;
+const APP = process.env.APP || pathToFileURL(resolve(DIR, '../../index.html')).href;
 writeFileSync(DIR + '/evidence.pdf', '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
 const results = [];
 const check = (area, name, ok, detail = '', kind = 'FAIL') => { results.push({area, name, status: ok ? 'PASS' : kind, detail}); console.log(`${ok ? 'PASS' : kind.padEnd(4)} [${area}] ${name}${detail ? ' :: ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : ''}`); };
