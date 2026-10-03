@@ -256,7 +256,7 @@ Q.seed = (data) => {
     {id: 'QM.12', chapter: 'QM', priority: 'normal', name: {ar: 'برنامج سلامة المرضى', en: 'Patient safety program'}, note: 'تحديث سجل المخاطر وخطة التوعية الفصلية قيد المراجعة.', elements: [
       E('خطة سلامة المرضى 2026', '2026 patient safety plan', 'approved', 'u1', {files: FILE('PS plan 2026.pdf', 530000, 'u1', '2026-01-20T10:00')}),
       E('سجل المخاطر المحدّث', 'Updated risk register', 'uploaded', 'u2', {files: FILE('Risk register Q3.pdf', 210000, 'u2', '2026-09-25T10:00')}),
-      E('جولات القيادة (Leadership rounds)', 'Leadership safety rounds', 'approved', 'u1', {files: FILE('Rounds Q3.pdf', 120000, 'u1', '2026-09-10T10:00')}),
+      E('جولات القيادة للسلامة', 'Leadership safety rounds', 'approved', 'u1', {files: FILE('Rounds Q3.pdf', 120000, 'u1', '2026-09-10T10:00')}),
       E('خطة التوعية الفصلية', 'Quarterly awareness plan', 'missing', 'u2')]},
     {id: 'IPSG.1', chapter: 'IPSG', priority: 'high', name: {ar: 'التعرف الصحيح على هوية المريض', en: 'Correct patient identification'}, note: 'بانتظار نتائج تدقيق الأشعة بعد تطبيق التحقق من معرّفين.', elements: [
       E('سياسة التعرف على المريض', 'Patient ID policy', 'approved', 'u2', {files: FILE('IPSG-1 policy.pdf', 160000, 'u2', '2026-02-02T10:00')}),

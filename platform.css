@@ -191,6 +191,7 @@ table.perm td:first-child,table.perm th:first-child{text-align:start}
 .data-grid h3{font-size:15px;margin-bottom:4px}
 .data-grid p{margin-bottom:12px;font-size:13px}
 .data-grid label.btn{cursor:pointer}
+.file-pick{cursor:pointer;margin-top:6px;width:max-content}
 
 /* login: لوحة الهوية + نموذج الدخول */
 .login{min-height:100dvh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);background:var(--bg)}
