@@ -298,7 +298,7 @@ Q.views.report = {render(parts) {
       ${['in', 'out'].includes(F.affected) ? `<fieldset class="w addr"><legend>${L('بطاقة المريض (Addressograph)', 'Patient addressograph')}</legend><div class="fgrid three">
         ${Q.f.text('mrn', L('رقم الملف', 'MRN'), F.mrn, {ltr: true, attrs: 'inputmode="numeric"'})}${Q.f.text('pname', L('الاسم', 'Name'), F.pname, {opt: L('(اختياري)', '(optional)')})}${Q.f.text('age', L('العمر', 'Age'), F.age)}${Q.f.sel('sex', L('الجنس', 'Sex'), [['M', L('ذكر', 'Male')], ['F', L('أنثى', 'Female')]], F.sex, {empty: '—'})}${Q.f.text('physician', L('الطبيب المعالج', 'Attending physician'), F.physician)}${Q.f.text('diagnosis', L('التشخيص', 'Diagnosis'), F.diagnosis)}</div></fieldset>` : ''}
       ${Q.f.area('desc', L('وصف ما حدث (وقائع فقط)', 'What happened (facts only)'), F.desc, {req: true, rows: 4, ph: L('ماذا حدث، أين، ومتى. تجنّب الافتراضات أو إلقاء اللوم.', 'What, where, when. Avoid assumptions or blame.')})}
-      ${Q.f.area('immediate', L('الإجراء الفوري المتخذ', 'Immediate action taken'), F.immediate, {rows: 2, ph: L('ما الذي تم لحماية المريض أو الموظف فورًا؟', 'What was done right away to protect the patient or staff?')})}
+      ${Q.f.area('immediate', L('الإجراء الفوري المتخذ', 'Immediate action taken'), F.immediate, {req: true, rows: 2, ph: L('ما الذي تم لحماية المريض أو الموظف فورًا؟', 'What was done right away to protect the patient or staff?')})}
       <div class="fl w">${L('مرفقات', 'Attachments')} <span class="opt">${L('(صور أو مستندات، حتى 10 ميجابايت للملف)', '(images or documents, up to 10 MB each)')}</span>
         <label class="btn btn-s sm file-pick">${ic('clip', 'sm')}${L('إرفاق ملفات', 'Attach files')}<input type="file" hidden multiple data-files accept="image/*,.pdf,.doc,.docx,.xlsx"></label>${F.files.length ? `<ul class="files">${F.files.map((f, i) => `<li>${ic('clip', 'sm')}${esc(f.name)} <small>${Q.fSize(f.size)}</small><button type="button" class="btn-g" data-act="rf-unfile" data-i="${i}">${L('إزالة', 'Remove')}</button></li>`).join('')}</ul>` : ''}</div>
     </div>`;
@@ -351,7 +351,7 @@ function mountForm(root) {
     Q.render(); });
 }
 const validate = s => { const F = Q.form;
-  if (s === 1) { if (!F.typeId || !F.deptId || !String(F.title).trim() || !F.occurredAt || String(F.desc).trim().length < 20) return L('أكمل الحقول الإلزامية، واكتب وصفًا لا يقل عن 20 حرفًا.', 'Complete required fields; the description needs at least 20 characters.');
+  if (s === 1) { if (!F.typeId || !F.deptId || !String(F.title).trim() || !F.occurredAt || String(F.desc).trim().length < 20 || !String(F.immediate || '').trim()) return L('أكمل الحقول الإلزامية (ومنها الإجراء الفوري المتخذ)، واكتب وصفًا لا يقل عن 20 حرفًا.', 'Complete the required fields (including the immediate action taken); the description needs at least 20 characters.');
     if (new Date(F.occurredAt) > Q.now()) return L('وقت الحدث لا يمكن أن يكون في المستقبل.', 'Occurrence time cannot be in the future.'); }
   if (s === 2 && !F.harm) return L('حدد مدى تأثير الحدث.', 'Select the impact.');
   return ''; };
