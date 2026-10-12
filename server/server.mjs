@@ -69,7 +69,7 @@ function importAll(body, force) {
 /* ---------- HTTP ---------- */
 const MIME = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2'};
-const STATIC_OK = /^\/(index\.html|styles\.css|platform\.css|js\/[\w.-]+\.js)?$/; // only the app itself is served
+const STATIC_OK = /^\/(index\.html|styles\.css|platform\.css|js\/[\w.-]+\.js|assets\/[\w.-]+\.(?:png|jpg|jpeg|webp|svg))?$/; // only approved app assets are served
 const MAX_BODY = 25 * 1048576;
 
 const send = (res, code, body, type = 'application/json') => { res.writeHead(code, {'Content-Type': type, 'Cache-Control': 'no-store'}); res.end(type === 'application/json' ? JSON.stringify(body) : body); };

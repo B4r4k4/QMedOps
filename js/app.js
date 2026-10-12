@@ -101,7 +101,8 @@ Q.render = () => {
 
 /* ---------- login ---------- */
 function renderLogin() {
-  const users = Q.db.all('users').filter(u => u.active !== false);
+  const active = Q.db.all('users').filter(u => u.active !== false);
+  const users = active.filter(u => !u.pwHash); // private accounts (own password) are never listed as demo accounts
   const order = ['director', 'qps', 'supervisor', 'biomed', 'reporter', 'admin'];
   const featured = order.map(r => users.find(u => u.role === r)).filter(Boolean);
   const flow = [
@@ -113,43 +114,121 @@ function renderLogin() {
     ['pulse', ['متابعة المؤشرات', 'Indicator tracking'], ['قياس أثر التحسين شهريًا', 'Monthly measure of improvement']]
   ];
   $('#login').innerHTML = `
-  <div class="login">
-    <aside class="login-brand">
-      <div class="brand big"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><div><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></div></div>
-      <div class="lb-copy">
-        <h2>${L('من البلاغ إلى التحسين، في مسار واحد.', 'From report to improvement, in one flow.')}</h2>
-        <p>${L('منصة الجودة وسلامة المرضى: بلاغات، تحقيق، إجراءات تصحيحية، ومؤشرات أداء في مكان واحد.', 'Quality and patient safety platform: reports, investigations, corrective actions and indicators in one place.')}</p>
+  <div class="landing">
+    <header class="landing-nav">
+      <a class="landing-brand" href="#landing-top" aria-label="${L('سلامة — الصفحة الرئيسية', 'Salamah — home')}"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></a>
+      <nav aria-label="${L('التنقل الرئيسي', 'Main navigation')}">
+        <a href="#landing-capabilities">${L('المنصة', 'Platform')}</a>
+        <a href="#landing-flow">${L('سير العمل', 'Workflow')}</a>
+        <a href="#landing-trust">${L('الحوكمة', 'Governance')}</a>
+      </nav>
+      <div class="landing-nav-actions">
+        <button class="lang" data-act="lang">${ic('globe', 'sm')}${L('English', 'العربية')}</button>
+        <a class="btn btn-p" href="#landing-login">${L('دخول المنصة', 'Sign in')}</a>
       </div>
-      <ol class="lb-flow">${flow.map(([icon, t, s], i) => `<li style="--i:${i}"><span class="i">${ic(icon, 'sm')}</span><div>${T(t)}<small>${T(s)}</small></div></li>`).join('')}</ol>
-    </aside>
-    <div class="login-main">
-      <div class="login-bar"><button class="lang" data-act="lang">${ic('globe', 'sm')}${L('English', 'العربية')}</button></div>
-    <section class="login-card">
-      <h1>${L('تسجيل الدخول', 'Sign in')}</h1>
-      <p class="muted">${esc(T(Q.S().facility))} · ${L('منصة الجودة وسلامة المرضى', 'Quality & patient safety platform')}</p>
-      <form data-login class="fgrid one">
-        ${Q.f.text('email', L('البريد الإلكتروني', 'Email'), '', {req: true, type: 'email', ltr: true, attrs: 'autocomplete="username"', ph: 'name@alsalam-hospital.sa'})}
-        ${Q.f.text('password', L('كلمة المرور', 'Password'), '', {req: true, type: 'password', attrs: 'autocomplete="current-password"'})}
-        <span class="err" data-err></span>
-        <button class="btn btn-p block" type="submit">${L('دخول', 'Sign in')}</button>
-      </form>
-    </section>
-    <section class="demo">
-      <h2>${L('حسابات التجربة', 'Pilot accounts')}</h2>
-      <p class="muted">${L('بيئة تجريبية تُحفظ بياناتها في هذا المتصفح. اختر حسابًا لتجربة صلاحياته، وكلمة المرور لكل الحسابات: ', 'Pilot environment stored in this browser. Pick an account to try its permissions. Password for all: ')}<b class="ltr">demo</b></p>
-      <div class="demo-list">${featured.map(u => `<button class="demo-u" data-act="demo-login" data-id="${u.id}">${Q.avatar(u.id)}<div><b>${esc(T(u.name))}</b><small>${T(Q.ROLES[u.role])} · ${Q.dshort(u.deptId)}</small></div>${ic('chev', 'sm flip')}</button>`).join('')}</div>
-      <details><summary>${L('كل الحسابات', 'All accounts')} (${users.length})</summary><div class="demo-list">${users.filter(u => !featured.includes(u)).map(u => `<button class="demo-u" data-act="demo-login" data-id="${u.id}">${Q.avatar(u.id, 's')}<div><b>${esc(T(u.name))}</b><small>${T(Q.ROLES[u.role])} · ${Q.dshort(u.deptId)}</small></div></button>`).join('')}</div></details>
-    </section>
-    </div>
+    </header>
+
+    <main id="landing-top">
+      <section class="landing-hero">
+        <div class="hero-copy">
+          <span class="eyebrow">${ic('shield', 'sm')}${L('تشغيل الجودة وسلامة المرضى', 'Quality & patient safety operations')}</span>
+          <h1>${L('تربط المنصة كل بلاغ بقرار، وكل قرار بتحسين موثّق.', 'The platform connects every report to a decision, and every decision to documented improvement.')}</h1>
+          <p>${L('تعرض سلامة أعمال الجودة وسلامة المرضى بصورة عامة، وتجمع البلاغات، وتقييم الخطورة، وتحليل الأسباب، والإجراءات التصحيحية، ومؤشرات الأداء في مساحة تشغيل واحدة.', 'Salamah presents quality and patient-safety operations in one place, bringing together reports, severity assessment, root-cause analysis, corrective actions and performance indicators.')}</p>
+          <div class="hero-actions">
+            <a class="btn btn-p btn-lg" href="#landing-login">${L('دخول المنصة', 'Sign in to the platform')}${ic('chev', 'sm flip')}</a>
+            <a class="btn btn-s btn-lg" href="#landing-flow">${L('استعرض مسار العمل', 'Explore the workflow')}</a>
+          </div>
+          <ul class="hero-points" aria-label="${L('مزايا أساسية', 'Core capabilities')}">
+            <li>${ic('check', 'sm')}${L('صلاحيات بحسب الدور', 'Role-based access')}</li>
+            <li>${ic('check', 'sm')}${L('سجل تدقيق لكل إجراء', 'Audit trail for every action')}</li>
+            <li>${ic('check', 'sm')}${L('واجهة عربية وإنجليزية', 'Arabic and English interface')}</li>
+          </ul>
+        </div>
+        <div class="hero-visual" aria-label="${L('تدقيق واضح لجودة الرعاية وسلامة المريض داخل المستشفى — صورة مفاهيمية', 'A clear hospital quality and patient-safety audit — conceptual image')}">
+          <img src="assets/qmedops-patient-safety-hero-v2.png" alt="${L('فريق صحي يتحقق من هوية المريض والدواء باستخدام قائمة سلامة وعلامات تحقق واضحة', 'Healthcare team verifies patient identity and medication using a safety checklist and clear check marks')}" width="1536" height="864">
+          <div class="hero-caption"><span class="live-dot"></span><span><b>${L('تدقيق سلامة المريض', 'Patient-safety audit')}</b><small>${L('تحقق من الهوية والدواء وجودة الإجراء', 'Identity, medication and process verification')}</small></span></div>
+          <div class="hero-signal signal-a">${ic('alert', 'sm')}<span><b>${L('تقييم الخطورة', 'Severity review')}</b><small>SAL · 4 × 4</small></span></div>
+          <div class="hero-signal signal-b">${ic('check-square', 'sm')}<span><b>${L('إجراء تصحيحي', 'Corrective action')}</b><small>${L('مسؤول · موعد · تحقق', 'Owner · due date · verification')}</small></span></div>
+        </div>
+      </section>
+
+      <section class="landing-band" aria-label="${L('نطاق المنصة', 'Platform scope')}">
+        <p>${L('مسار تشغيلي واحد يربط:', 'One operating flow connects:')}</p>
+        <div><span>${L('البلاغات', 'Reports')}</span><i></i><span>${L('التحقيقات', 'Investigations')}</span><i></i><span>CAPA</span><i></i><span>${L('المؤشرات', 'Indicators')}</span><i></i><span>${L('الامتثال', 'Compliance')}</span></div>
+      </section>
+
+      <section class="landing-section" id="landing-capabilities">
+        <div class="section-head">
+          <span class="eyebrow">${L('منصة واحدة، سياق كامل', 'One platform, complete context')}</span>
+          <h2>${L('تدعم المنصة العمل اليومي، ولا تكتفي بعرض التقارير.', 'The platform supports daily operations, not just reporting.')}</h2>
+          <p>${L('يرى كل عضو في الفريق ما يحتاجه للعمل: المهمة التالية، المسؤول، الموعد، والدليل المرتبط بها.', 'Every team member sees what they need to act: the next task, its owner, due date and supporting evidence.')}</p>
+        </div>
+        <div class="cap-grid">
+          <article class="cap cap-main"><span class="cap-icon">${ic('report')}</span><div><b>${L('تدير المنصة الحدث من البلاغ حتى الإغلاق', 'The platform manages each event from reporting to closure')}</b><p>${L('يسجّل الفريق البلاغ، ويوثّق الإجراء الفوري، ويقيّم الخطورة، ثم ينقل الحالة عبر المراجعة والتحقيق مع بقاء السياق كاملًا.', 'The team captures the report, documents immediate action, assesses severity and moves the case through review and investigation while preserving its context.')}</p></div><div class="mini-case"><span><i></i><b>OVR-2026-1048</b></span><em>${L('مراجعة الجودة', 'QPS review')}</em><div><small>${L('اكتمال المسار', 'Workflow progress')}</small><b>68%</b></div><progress value="68" max="100">68%</progress></div></article>
+          <article class="cap"><span class="cap-icon">${ic('search')}</span><b>${L('تحليل سبب جذري منظم', 'Structured root-cause analysis')}</b><p>${L('خط زمني، 5 لماذا، ومخطط عظم السمكة ضمن سجل الحالة.', 'Timeline, 5 Whys and fishbone analysis in the case record.')}</p></article>
+          <article class="cap"><span class="cap-icon">${ic('check-square')}</span><b>${L('إجراءات قابلة للمتابعة', 'Actions teams can follow')}</b><p>${L('مسؤول واضح، موعد، تحديثات، ثم تحقق مستقل من الفاعلية.', 'Clear owner, due date, updates, then independent effectiveness verification.')}</p></article>
+          <article class="cap"><span class="cap-icon">${ic('chart')}</span><b>${L('مؤشرات مرتبطة بالتحسين', 'Indicators tied to improvement')}</b><p>${L('تابع الاتجاهات والأهداف واربط أثر الإجراءات بالنتائج الشهرية.', 'Track trends and targets, and connect actions to monthly outcomes.')}</p></article>
+          <article class="cap"><span class="cap-icon">${ic('file')}</span><b>${L('جاهزية أدلة الامتثال', 'Compliance evidence readiness')}</b><p>${L('نظّم المعايير والأدلة والنواقص والمسؤوليات في عرض عملي.', 'Organize standards, evidence, gaps and ownership in an operational view.')}</p></article>
+        </div>
+      </section>
+
+      <section class="landing-section flow-section" id="landing-flow">
+        <div class="section-head compact">
+          <span class="eyebrow">${L('من الحدث إلى التعلّم المؤسسي', 'From event to organizational learning')}</span>
+          <h2>${L('مسار واضح، دون قفزات بين الأدوات.', 'A clear workflow without jumping between tools.')}</h2>
+        </div>
+        <ol class="landing-flow">${flow.map(([icon, t, s], i) => `<li style="--i:${i}"><span class="flow-num">${String(i + 1).padStart(2, '0')}</span><span class="flow-icon">${ic(icon)}</span><div><b>${T(t)}</b><small>${T(s)}</small></div></li>`).join('')}</ol>
+      </section>
+
+      <section class="landing-section product-section">
+        <div class="product-copy">
+          <span class="eyebrow">${L('مركز عمليات حي', 'A live operations center')}</span>
+          <h2>${L('ما يحتاج انتباهك يظهر أولًا.', 'What needs attention appears first.')}</h2>
+          <p>${L('تنبيهات زمنية، حالات عالية الخطورة، إجراءات متأخرة، واتجاهات المؤشرات في لوحة موحّدة تساعد الفريق على ترتيب العمل.', 'Time-sensitive alerts, high-risk cases, overdue actions and indicator trends come together so the team can prioritize work.')}</p>
+          <ul><li>${ic('check', 'sm')}${L('قائمة مهام شخصية حسب الصلاحية', 'Personal task list based on permissions')}</li><li>${ic('check', 'sm')}${L('تنبيهات للمواعيد والتصعيد', 'Due-date and escalation alerts')}</li><li>${ic('check', 'sm')}${L('بحث موحّد في السجلات', 'Unified record search')}</li></ul>
+        </div>
+        <div class="product-window" aria-label="${L('معاينة لوحة مركز العمليات', 'Operations dashboard preview')}">
+          <div class="pw-top"><span></span><span></span><span></span><b>${L('مركز العمليات', 'Operations center')}</b></div>
+          <div class="pw-body"><aside><span class="on"></span><span></span><span></span><span></span><span></span></aside><div class="pw-content"><div class="pw-title"><span><b>${L('صباح الخير، د. سارة', 'Good morning, Dr Sara')}</b><small>${L('هذه أولويات اليوم', 'Here are today’s priorities')}</small></span><em>${L('نظرة اليوم', 'Today')}</em></div><div class="pw-alert"><i>${ic('alert', 'sm')}</i><span><b>${L('إخطار خارجي خلال ساعتين', 'External notice due in 2 hours')}</b><small>OVR-2026-1048 · NICU</small></span><button>${L('فتح الحالة', 'Open case')}</button></div><div class="pw-kpis"><span><small>${L('بلاغات مفتوحة', 'Open reports')}</small><b>18</b><i class="teal"></i></span><span><small>${L('إجراءات متأخرة', 'Overdue actions')}</small><b>4</b><i class="red"></i></span><span><small>${L('جاهزية الأدلة', 'Evidence readiness')}</small><b>82%</b><i></i></span></div><div class="pw-lower"><div><b>${L('اتجاه مؤشرات السلامة', 'Safety indicator trend')}</b><svg viewBox="0 0 300 90" preserveAspectRatio="none" aria-hidden="true"><path d="M0 68 C38 61 52 69 78 51 S128 57 153 38 S203 42 230 24 S270 31 300 12"/><path class="fill" d="M0 68 C38 61 52 69 78 51 S128 57 153 38 S203 42 230 24 S270 31 300 12 V90 H0Z"/></svg></div><div><b>${L('المهام القادمة', 'Next tasks')}</b><p><i></i><span>${L('مراجعة تحليل السبب', 'Review root-cause analysis')}</span></p><p><i></i><span>${L('اعتماد إجراء تصحيحي', 'Approve corrective action')}</span></p><p><i></i><span>${L('رفع دليل الامتثال', 'Upload compliance evidence')}</span></p></div></div></div></div>
+        </div>
+      </section>
+
+      <section class="landing-section trust-section" id="landing-trust">
+        <div class="trust-copy"><span class="eyebrow">${L('حوكمة مدمجة في سير العمل', 'Governance built into the workflow')}</span><h2>${L('وضوح المسؤولية في كل خطوة.', 'Clear accountability at every step.')}</h2><p>${L('تدعم المنصة فصل الصلاحيات، التوثيق الزمني، وتتبع التغييرات. حالة التكامل مع الأنظمة الخارجية تُعرض بوضوح ولا تُفترض تلقائيًا.', 'The platform supports separation of duties, timestamped documentation and change tracking. External integrations are shown transparently and are never implied by default.')}</p></div>
+        <div class="trust-list"><article>${ic('lock')}<span><b>${L('صلاحيات حسب الدور', 'Role-based permissions')}</b><small>${L('تحدّد المنصة الوصول والإجراءات وفق مسؤولية كل مستخدم.', 'The platform sets access and actions according to each user’s responsibility.')}</small></span></article><article>${ic('clock')}<span><b>${L('أثر زمني قابل للمراجعة', 'Reviewable timeline')}</b><small>${L('يوضح السجل من ينشئ، ويراجع، ويعدّل، ويغلق كل حالة.', 'The timeline shows who creates, reviews, changes and closes each case.')}</small></span></article><article>${ic('plug')}<span><b>${L('تكاملات صريحة', 'Explicit integrations')}</b><small>${L('تظهر حالة الربط الفعلية داخل المنصة.', 'Actual connection status is visible in the platform.')}</small></span></article></div>
+      </section>
+
+      <section class="landing-access" id="landing-login">
+        <div class="access-copy"><span class="eyebrow">${L('بيئة العرض الحالية', 'Current demo environment')}</span><h2>${L('تفتح المنصة مساحة عمل موحّدة للفريق.', 'The platform provides one shared workspace for the team.')}</h2><p>${L('تتيح صفحة الدخول استخدام بيانات الحساب أو اختيار حساب تجريبي يعرض مستويات مختلفة من الصلاحيات.', 'The sign-in area accepts account credentials or provides pilot accounts that demonstrate different permission levels.')}</p><div class="access-note">${ic('info', 'sm')}<span>${L('تحفظ البيئة التجريبية بياناتها محليًا في هذا المتصفح.', 'The demo environment stores its data locally in this browser.')}</span></div></div>
+        <div class="access-panel">
+          <section class="login-card">
+            <h2>${L('تسجيل الدخول', 'Sign in')}</h2>
+            <p class="muted">${esc(T(Q.S().facility))} · ${L('منصة الجودة وسلامة المرضى', 'Quality & patient safety platform')}</p>
+            <form data-login class="fgrid one">
+              ${Q.f.text('email', L('البريد الإلكتروني', 'Email'), '', {req: true, type: 'email', ltr: true, attrs: 'autocomplete="username"', ph: 'name@alsalam-hospital.sa'})}
+              ${Q.f.text('password', L('كلمة المرور', 'Password'), '', {req: true, type: 'password', attrs: 'autocomplete="current-password"'})}
+              <span class="err" data-err></span>
+              <button class="btn btn-p block" type="submit">${L('دخول', 'Sign in')}</button>
+            </form>
+          </section>
+          <section class="demo">
+            <div class="demo-head"><span><h3>${L('حسابات التجربة', 'Pilot accounts')}</h3><p class="muted">${L('كلمة المرور لكل الحسابات:', 'Password for all accounts:')} <b class="ltr">demo</b></p></span></div>
+            <div class="demo-list">${featured.slice(0, 4).map(u => `<button class="demo-u" data-act="demo-login" data-id="${u.id}">${Q.avatar(u.id)}<div><b>${esc(T(u.name))}</b><small>${T(Q.ROLES[u.role])} · ${Q.dshort(u.deptId)}</small></div>${ic('chev', 'sm flip')}</button>`).join('')}</div>
+            <details><summary>${L('عرض كل الحسابات', 'View all accounts')} (${users.length})</summary><div class="demo-list">${users.filter(u => !featured.slice(0, 4).includes(u)).map(u => `<button class="demo-u" data-act="demo-login" data-id="${u.id}">${Q.avatar(u.id, 's')}<div><b>${esc(T(u.name))}</b><small>${T(Q.ROLES[u.role])} · ${Q.dshort(u.deptId)}</small></div></button>`).join('')}</div></details>
+          </section>
+        </div>
+      </section>
+    </main>
+    <footer class="landing-footer"><div class="landing-brand"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></div><p>${L('منصة تشغيل الجودة وسلامة المرضى.', 'Quality and patient-safety operations platform.')}</p><a href="#landing-top">${L('العودة للأعلى', 'Back to top')} ↑</a></footer>
   </div>`;
   $('[data-login]').addEventListener('submit', e => {
     e.preventDefault(); const d = Q.formData(e.target);
-    const u = users.find(x => x.email.toLowerCase() === String(d.email).trim().toLowerCase());
-    if (!u || d.password !== 'demo') { $('[data-err]').textContent = L('البريد أو كلمة المرور غير صحيحة.', 'Incorrect email or password.'); return; }
+    const u = active.find(x => x.email.toLowerCase() === String(d.email).trim().toLowerCase());
+    if (!u || !Q.checkPassword(u, String(d.password || ''))) { $('[data-err]').textContent = L('البريد أو كلمة المرور غير صحيحة.', 'Incorrect email or password.'); return; }
     Q.login(u.id); location.hash = Q.home(); Q.render();
   });
 }
-Q.act('demo-login', el => { Q.login(el.dataset.id); location.hash = Q.home(); Q.render(); Q.toast(L(`مرحبًا ${T(Q.me.name)}`, `Welcome, ${T(Q.me.name)}`)); });
+Q.act('demo-login', el => { const u = Q.user(el.dataset.id); if (!u || u.pwHash || u.active === false) return; Q.login(u.id); location.hash = Q.home(); Q.render(); Q.toast(L(`مرحبًا ${T(Q.me.name)}`, `Welcome, ${T(Q.me.name)}`)); });
 
 /* ---------- popovers ---------- */
 Q.openPop = (anchor, html) => {
@@ -179,7 +258,7 @@ Q.act('user-menu', el => {
 Q.act('logout', () => { Q.logout(); Q.render(); });
 Q.act('switch-user', () => {
   Q.modal({title: L('تبديل الحساب', 'Switch account'), sub: L('للتجربة فقط: جرّب سير العمل بصلاحيات مختلفة', 'Pilot only: try the workflow with different roles'),
-    body: `<div class="fgrid one">${Q.f.sel('u', L('الحساب', 'Account'), Q.userOpts(), Q.me.id)}</div>`, submit: L('تبديل', 'Switch'),
+    body: `<div class="fgrid one">${Q.f.sel('u', L('الحساب', 'Account'), Q.userOpts(u => !u.pwHash || u.id === Q.me.id), Q.me.id)}</div>`, submit: L('تبديل', 'Switch'),
     onSubmit: d => { Q.login(d.u); location.hash = Q.home(); Q.render(); Q.toast(L(`تم الدخول باسم ${T(Q.me.name)}`, `Signed in as ${T(Q.me.name)}`)); }});
 });
 Q.act('lang', () => { Q.lang = Q.lang === 'ar' ? 'en' : 'ar'; Q.pref.set('lang', Q.lang); Q.render(); });
@@ -343,6 +422,13 @@ document.addEventListener('click', e => {
   const pop = $('#pop');
   if (!pop.hidden && !e.target.closest('#pop') && !e.target.closest('[data-act="notifs"],[data-act="user-menu"]')) Q.closePop();
   if (e.target.closest('#pop a')) Q.closePop();
+  const landingLink = e.target.closest('.landing a[href^="#landing-"]');
+  if (landingLink) {
+    e.preventDefault();
+    const target = document.querySelector(landingLink.getAttribute('href'));
+    if (target) target.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+    return;
+  }
   const a = e.target.closest('[data-act]');
   if (a && Q.acts[a.dataset.act]) { e.preventDefault(); Q.acts[a.dataset.act](a, e); return; }
   const row = e.target.closest('tr[data-href]');

@@ -89,7 +89,7 @@ const newMeta = () => ({version: 1, bilingual: 1, seededAt: Q.iso(Q.now())});
 Q.db = {
   data: {}, persistent: false, remote: false, rev: 0, epoch: 0, prefs: {}, queue: Promise.resolve(), inflight: {}, acked: {},
   async init() {
-    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store'}); if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
+    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store'}); if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.ensureAccounts(); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
     try { idb = await openIDB(); this.persistent = true; } catch (e) { idb = null; }
     let meta = null;
     if (idb) { try { meta = await kvGet('meta'); } catch (e) { meta = null; } }
@@ -97,6 +97,7 @@ Q.db = {
       for (const c of COLS) this.data[c] = (await kvGet(c)) || [];
       this.data.settings = (await kvGet('settings')) || Q.defaultSettings();
       this.data.meta = meta;
+      this.ensureAccounts();
       if (!meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); meta.bilingual = 1; await this.flushAll(); }
     } else {
       Q.seed(this.data);
@@ -113,6 +114,8 @@ Q.db = {
     if (!this.data.meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); this.data.meta.bilingual = 1; await this.flushAll(); }
   },
   pack(src) { const o = {settings: src.settings}; COLS.forEach(c => o[c] = src[c] || []); return o; },
+  /* add shipped private accounts that this data set does not have yet (existing browsers / databases) */
+  ensureAccounts() { (Q.ensureAccounts ? Q.ensureAccounts(this.data) : []).forEach(u => this.put('users', u)); },
   /* ordered write to the server; failures surface as a toast */
   send(key, method, path, body, headers) {
     this.inflight[key] = (this.inflight[key] || 0) + 1;
@@ -222,7 +225,28 @@ const P = {
   'dashboard': ['qps', 'director', 'admin', 'supervisor', 'biomed']
 };
 Q.me = null;
-Q.can = (perm, u = Q.me) => !!u && (P[perm] || []).includes(u.role);
+/* role grants a permission unless the user carries a personal restriction (u.deny), e.g. ['admin'] */
+Q.can = (perm, u = Q.me) => !!u && (P[perm] || []).includes(u.role) && !(u.deny || []).includes(perm);
+
+/* SHA-256 (sync, no secure-context requirement) for per-user passwords; stored as hash of "<userId>:<password>" */
+Q.sha256 = str => {
+  const K = [], H = [], isP = n => { for (let f = 2; f * f <= n; f++) if (n % f === 0) return false; return true; }, fr = x => (x - Math.floor(x)) * 4294967296 | 0;
+  for (let n = 2, i = 0; i < 64; n++) if (isP(n)) { if (i < 8) H[i] = fr(Math.pow(n, 1 / 2)); K[i++] = fr(Math.pow(n, 1 / 3)); }
+  const bytes = [...new TextEncoder().encode(str)], l = bytes.length * 8; bytes.push(0x80); while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let s = 56; s >= 0; s -= 8) bytes.push(s >= 32 ? Math.floor(l / 2 ** s) & 255 : (l >>> s) & 255);
+  const r = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < bytes.length; o += 64) {
+    const w = []; for (let i = 0; i < 16; i++) w[i] = (bytes[o + 4 * i] << 24) | (bytes[o + 4 * i + 1] << 16) | (bytes[o + 4 * i + 2] << 8) | bytes[o + 4 * i + 3];
+    for (let i = 16; i < 64; i++) { const s0 = r(w[i - 15], 7) ^ r(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = r(w[i - 2], 17) ^ r(w[i - 2], 19) ^ (w[i - 2] >>> 10); w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) { const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0, t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0; h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0; }
+    [a, b, c, d, e, f, g, h].forEach((v, i) => { H[i] = (H[i] + v) | 0; });
+  }
+  return H.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+};
+Q.pwHash = (userId, pw) => Q.sha256(`${userId}:${pw}`);
+/* private accounts have their own password; shared demo accounts use "demo" */
+Q.checkPassword = (u, pw) => u.pwHash ? Q.pwHash(u.id, pw) === u.pwHash : pw === 'demo';
 Q.canSeeIncident = (x, u = Q.me) => {
   if (!u) return false;
   if (Q.can('incident.all', u)) return true;

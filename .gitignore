@@ -4,6 +4,7 @@
 *.xlsx
 *.pdf
 *.png
+!assets/*.png
 # SQLite database (contains live data)
 server/data/
 *.db

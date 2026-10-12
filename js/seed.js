@@ -4,6 +4,16 @@
 const Q = window.Q;
 const REF = new Date('2026-09-29T11:50:00+03:00');
 
+/* private accounts shipped with the app: own password (stored as SHA-256 of "<id>:<password>"), never listed as demo accounts.
+   Q.ensureAccounts adds any that are missing to new and existing data; it never overwrites an account an admin has edited. */
+Q.ACCOUNTS = [];
+Q.ensureAccounts = data => {
+  const users = data.users || (data.users = []), added = [];
+  Q.ACCOUNTS.forEach(a => { if (users.some(u => u.id === a.id || String(u.email || '').toLowerCase() === a.email)) return;
+    const u = Object.assign(JSON.parse(JSON.stringify(a)), {createdAt: new Date().toISOString()}); users.push(u); added.push(u); });
+  return added;
+};
+
 Q.seed = (data) => {
   const SHIFT = Date.now() - REF.getTime();
   const D = s => new Date(new Date(s + ':00+03:00').getTime() + SHIFT).toISOString();
@@ -51,6 +61,7 @@ Q.seed = (data) => {
     ['u16', 'هيا الدوسري', 'Haya Aldosari', 'reporter', 'pharm', 'haya.d'],
     ['u17', 'د. عمر باسلامة', 'Dr. Omar Baslamah', 'supervisor', 'med', 'omar.b']
   ].map(([id, ar, en, role, deptId, mail]) => ({id, name: {ar, en}, role, deptId, email: `${mail}@alsalam-hospital.sa`, active: true, createdAt: D('2026-01-04T09:00')}));
+  Q.ensureAccounts(data);
   data.depts.forEach(d => { const h = data.users.find(u => u.deptId === d.id && ['supervisor', 'director', 'biomed', 'admin'].includes(u.role)); d.headId = h ? h.id : null; });
   const sup = dept => (data.users.find(u => u.deptId === dept && u.role === 'supervisor') || {id: 'u1'}).id;
 
