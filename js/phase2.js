@@ -235,7 +235,7 @@ Q.act('sv-new', () => Q.modal({title: L('استبيان جديد', 'New survey')
     if (tpl) s.dimensions = tpl; else s.items = JSON.parse(JSON.stringify(PATIENT_TPL)); Q.db.put('surveys', s); Q.go('#/surveys/' + s.id); }}));
 /* public response page: no sign-in, nothing identifies the respondent */
 /* a patient's browser never loads the platform database: with the server it fetches only this survey (Q.publicBoot) */
-Q.publicBoot = async () => { if (!/^https?:$/.test(location.protocol)) return false; const id = Q.parseHash().parts[1];
+Q.publicBoot = async () => { if (!Q.API) return false; const id = Q.parseHash().parts[1];
   try { const r = await fetch(`api/public/survey/${encodeURIComponent(id)}`, {cache: 'no-store'}); Q._pub = r.ok ? Object.assign(await r.json(), {remote: true}) : {survey: null, depts: [], remote: true}; } catch (e) { return false; }
   Q.render(); return true; };
 const pubDepts = () => Q._pub ? Q._pub.depts.map(d => [d.id, T(d.name)]) : Q.deptOpts(d => !['qps', 'biomed', 'it'].includes(d.id));

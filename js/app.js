@@ -106,10 +106,10 @@ Q.render = () => {
   Q.closePop();
   const pr = Q.parseHash();
   if (pr.name === 's' && Q.publicSurvey) { $('#app').hidden = true; $('#login').hidden = false; $('#login').innerHTML = Q.publicSurvey(pr.parts, pr.query); Q.mountPublic($('#login')); document.title = L('سلامة | استبيان', 'Salamah | Survey'); return; }
-  if (!Q.me) { $('#app').hidden = true; $('#login').hidden = false; renderLogin(); document.title = L('سلامة | تسجيل الدخول', 'Salamah | Sign in'); return; }
+  if (!Q.me) { $('#app').hidden = true; $('#login').hidden = false; if (pr.name === 'login') renderSignIn(); else renderLogin(); document.title = pr.name === 'login' ? L('سلامة | تسجيل الدخول', 'Salamah | Sign in') : L('سلامة | منصة الجودة وسلامة المرضى', 'Salamah | Quality & patient safety'); return; }
   $('#app').hidden = false; $('#login').hidden = true;
   const r = Q.parseHash();
-  if (!r.name) { location.replace(Q.home()); return; }
+  if (!r.name || r.name === 'login') { location.replace(Q.home()); return; }
   const v = Q.views[r.name];
   let out;
   if (!v) out = {title: L('غير موجود', 'Not found'), html: Q.empty(L('الصفحة غير موجودة.', 'Page not found.'), 'search', `<a class="btn btn-s" href="${Q.home()}">${L('العودة', 'Back')}</a>`)};
@@ -148,7 +148,7 @@ function renderLogin() {
       </nav>
       <div class="landing-nav-actions">
         <button class="lang" data-act="lang">${ic('globe', 'sm')}${L('English', 'العربية')}</button>
-        <a class="btn btn-p" href="#landing-login">${L('دخول المنصة', 'Sign in')}</a>
+        <a class="btn btn-p" href="#/login">${L('دخول المنصة', 'Sign in')}</a>
       </div>
     </header>
 
@@ -159,7 +159,7 @@ function renderLogin() {
           <h1>${L('تربط المنصة كل بلاغ بقرار، وكل قرار بتحسين موثّق.', 'The platform connects every report to a decision, and every decision to documented improvement.')}</h1>
           <p>${L('تعرض سلامة أعمال الجودة وسلامة المرضى بصورة عامة، وتجمع البلاغات، وتقييم الخطورة، وتحليل الأسباب، والإجراءات التصحيحية، ومؤشرات الأداء في مساحة تشغيل واحدة.', 'Salamah presents quality and patient-safety operations in one place, bringing together reports, severity assessment, root-cause analysis, corrective actions and performance indicators.')}</p>
           <div class="hero-actions">
-            <a class="btn btn-p btn-lg" href="#landing-login">${L('دخول المنصة', 'Sign in to the platform')}${ic('chev', 'sm flip')}</a>
+            <a class="btn btn-p btn-lg" href="#/login">${L('دخول المنصة', 'Sign in to the platform')}${ic('chev', 'sm flip')}</a>
             <a class="btn btn-s btn-lg" href="#landing-flow">${L('استعرض مسار العمل', 'Explore the workflow')}</a>
           </div>
           <ul class="hero-points" aria-label="${L('مزايا أساسية', 'Core capabilities')}">
@@ -224,9 +224,32 @@ function renderLogin() {
 
       <section class="landing-access" id="landing-login">
         <div class="access-copy"><span class="eyebrow">${L('بيئة العرض الحالية', 'Current demo environment')}</span><h2>${L('تفتح المنصة مساحة عمل موحّدة للفريق.', 'The platform provides one shared workspace for the team.')}</h2><p>${L('تتيح صفحة الدخول استخدام بيانات الحساب أو اختيار حساب تجريبي يعرض مستويات مختلفة من الصلاحيات.', 'The sign-in area accepts account credentials or provides pilot accounts that demonstrate different permission levels.')}</p><div class="access-note">${ic('info', 'sm')}<span>${L('تحفظ البيئة التجريبية بياناتها محليًا في هذا المتصفح.', 'The demo environment stores its data locally in this browser.')}</span></div></div>
+        <div class="access-cta"><a class="btn btn-lg access-btn" href="#/login">${L('دخول المنصة', 'Sign in to the platform')}${ic('chev', 'sm flip')}</a></div>
+      </section>
+    </main>
+    <footer class="landing-footer"><div class="landing-brand"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></div><p>${L('منصة تشغيل الجودة وسلامة المرضى.', 'Quality and patient-safety operations platform.')}</p><a href="#landing-top">${L('العودة للأعلى', 'Back to top')} ↑</a></footer>
+  </div>`;
+}
+
+/* dedicated sign-in page (#/login) — every "دخول المنصة" button opens it */
+function renderSignIn() {
+  const active = Q.db.all('users').filter(u => u.active !== false);
+  const users = active.filter(u => !u.pwHash); // private accounts (own password) are never listed as demo accounts
+  const order = ['director', 'qps', 'supervisor', 'biomed', 'reporter', 'admin'];
+  const featured = order.map(r => users.find(u => u.role === r)).filter(Boolean);
+  $('#login').innerHTML = `
+  <div class="landing signin-page">
+    <header class="landing-nav">
+      <a class="landing-brand" href="#/" aria-label="${L('سلامة — الصفحة الرئيسية', 'Salamah — home')}"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></a>
+      <div class="landing-nav-actions">
+        <button class="lang" data-act="lang">${ic('globe', 'sm')}${L('English', 'العربية')}</button>
+        <a class="btn btn-s" href="#/">${L('الصفحة الرئيسية', 'Home')}</a>
+      </div>
+    </header>
+    <main class="signin-main">
         <div class="access-panel">
           <section class="login-card">
-            <h2>${L('تسجيل الدخول', 'Sign in')}</h2>
+            <h1>${L('تسجيل الدخول', 'Sign in')}</h1>
             <p class="muted">${esc(T(Q.S().facility))} · ${L('منصة الجودة وسلامة المرضى', 'Quality & patient safety platform')}</p>
             <form data-login class="fgrid one">
               ${Q.f.text('email', L('البريد الإلكتروني', 'Email'), '', {req: true, type: 'email', ltr: true, attrs: 'autocomplete="username"', ph: 'name@alsalam-hospital.sa'})}
@@ -241,9 +264,7 @@ function renderLogin() {
             <details><summary>${L('عرض كل الحسابات', 'View all accounts')} (${users.length})</summary><div class="demo-list">${users.filter(u => !featured.slice(0, 4).includes(u)).map(u => `<button class="demo-u" data-act="demo-login" data-id="${u.id}">${Q.avatar(u.id, 's')}<div><b>${esc(T(u.name))}</b><small>${T(Q.ROLES[u.role])} · ${Q.dshort(u.deptId)}</small></div></button>`).join('')}</div></details>
           </section>
         </div>
-      </section>
     </main>
-    <footer class="landing-footer"><div class="landing-brand"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></div><p>${L('منصة تشغيل الجودة وسلامة المرضى.', 'Quality and patient-safety operations platform.')}</p><a href="#landing-top">${L('العودة للأعلى', 'Back to top')} ↑</a></footer>
   </div>`;
   $('[data-login]').addEventListener('submit', async e => {
     e.preventDefault(); const d = Q.formData(e.target);
@@ -486,7 +507,7 @@ document.addEventListener('submit', e => {
     Q.go('#/incidents?q=' + encodeURIComponent(e.target.q.value.trim()));
   }
 });
-window.addEventListener('hashchange', () => { Q.render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { Q.render(); const a = /^#landing-/.test(location.hash) && document.getElementById(location.hash.slice(1)); if (a) a.scrollIntoView(); else window.scrollTo(0, 0); });
 
 /* ---------- server session ---------- */
 Q.sessionOk = async () => { const t = Q.pref.get('token', null); if (!t) return false;

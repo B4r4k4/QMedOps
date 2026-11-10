@@ -77,7 +77,8 @@ const memFiles = {};
 const timers = {};
 
 /* server API (same origin); writes go through one ordered queue */
-const API = /^https?:$/.test(location.protocol) ? 'api' : null;
+/* static hosting (GitHub Pages) has no server: run the browser-only demo there */
+const API = /^https?:$/.test(location.protocol) && !/\.github\.io$/i.test(location.hostname) ? 'api' : null;
 Q.API = API;
 /* server session: every API call carries the token; a 401 means the session ended, so the page returns to sign-in */
 Q.auth = h => { const t = Q.pref.get('token', null); return t ? Object.assign({Authorization: 'Bearer ' + t}, h) : h; };
