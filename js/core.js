@@ -60,7 +60,7 @@ Q.ago = v => { const d = Q.d(v), m = Math.round((Q.now() - d) / 6e4);
 Q.fSize = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
 
 /* ---------- storage: SQLite server (when served over http) → IndexedDB → memory ---------- */
-const COLS = ['users','depts','types','incidents','rca','capa','kpis','kpiValues','standards','devices','maint','audit','comments'];
+const COLS = ['users','depts','types','incidents','rca','capa','kpis','kpiValues','standards','devices','maint','audit','comments','policies','complaints','checklists','rounds','risks','fmeas','surveys','responses','committees','meetings','extreports','mocks','drills','records','projects','plans'];
 Q.COLS = COLS;
 const DBN = 'salamah-qmedops', VER = 1;
 let idb = null;
@@ -78,9 +78,14 @@ const timers = {};
 
 /* server API (same origin); writes go through one ordered queue */
 const API = /^https?:$/.test(location.protocol) ? 'api' : null;
+Q.API = API;
+/* server session: every API call carries the token; a 401 means the session ended, so the page returns to sign-in */
+Q.auth = h => { const t = Q.pref.get('token', null); return t ? Object.assign({Authorization: 'Bearer ' + t}, h) : h; };
+Q.authLost = () => { if (Q._lost) return; Q._lost = true; Q.pref.del('token'); Q.pref.del('session'); try { Q.toast(L('انتهت الجلسة، سجّل الدخول من جديد', 'Your session ended; please sign in again'), 'err'); } catch (e) {} setTimeout(() => location.reload(), 900); };
 const call = async (method, path, body, headers = {}) => {
   const isJSON = body !== undefined && !(body instanceof Blob);
-  const r = await fetch(`${API}${path}`, {method, cache: 'no-store', headers: isJSON ? Object.assign({'Content-Type': 'application/json'}, headers) : headers, body: isJSON ? JSON.stringify(body) : body});
+  const r = await fetch(`${API}${path}`, {method, cache: 'no-store', headers: Q.auth(isJSON ? Object.assign({'Content-Type': 'application/json'}, headers) : headers), body: isJSON ? JSON.stringify(body) : body});
+  if (r.status === 401) { Q.authLost(); throw new Error('signed out'); }
   if (!r.ok && r.status !== 409 && r.status !== 404) throw new Error(`${method} ${path}: ${r.status}`);
   return r;
 };
@@ -89,7 +94,7 @@ const newMeta = () => ({version: 1, bilingual: 1, seededAt: Q.iso(Q.now())});
 Q.db = {
   data: {}, persistent: false, remote: false, rev: 0, epoch: 0, prefs: {}, queue: Promise.resolve(), inflight: {}, acked: {},
   async init() {
-    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store'}); if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.ensureAccounts(); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
+    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store', headers: Q.auth({})}); if (r.status === 401) { Q.authLost(); return; } if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.ensureAccounts(); this.ensureQuality(); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
     try { idb = await openIDB(); this.persistent = true; } catch (e) { idb = null; }
     let meta = null;
     if (idb) { try { meta = await kvGet('meta'); } catch (e) { meta = null; } }
@@ -97,7 +102,7 @@ Q.db = {
       for (const c of COLS) this.data[c] = (await kvGet(c)) || [];
       this.data.settings = (await kvGet('settings')) || Q.defaultSettings();
       this.data.meta = meta;
-      this.ensureAccounts();
+      this.ensureAccounts(); this.ensureQuality();
       if (!meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); meta.bilingual = 1; await this.flushAll(); }
     } else {
       Q.seed(this.data);
@@ -109,13 +114,19 @@ Q.db = {
   async load(d) {
     if (d.empty) { const fresh = {}; Q.seed(fresh); fresh.meta = newMeta(); await call('POST', '/import', Object.assign(this.pack(fresh), {meta: fresh.meta})); d = await (await call('GET', '/data')).json(); }
     COLS.forEach(c => this.data[c] = d[c] || []);
+    /* ids of records this user may not see (no content): used only so new numbers never collide with them */
+    this.hidden = {}; Object.entries(d.hiddenIds || {}).forEach(([c, ids]) => { this.hidden[c] = new Set(ids); });
     this.data.settings = Object.assign(Q.defaultSettings(), d.settings || {}); this.data.meta = d.meta || newMeta();
     this.prefs = d.prefs || {}; this.rev = d.rev; this.epoch = d.epoch;
-    if (!this.data.meta.bilingual && Q.bilingualize) { Q.bilingualize(this.data); this.data.meta.bilingual = 1; await this.flushAll(); }
+    if (!this.data.meta.bilingual && Q.bilingualize && this.canMigrate()) { Q.bilingualize(this.data); this.data.meta.bilingual = 1; await this.flushAll(); }
   },
   pack(src) { const o = {settings: src.settings}; COLS.forEach(c => o[c] = src[c] || []); return o; },
   /* add shipped private accounts that this data set does not have yet (existing browsers / databases) */
-  ensureAccounts() { (Q.ensureAccounts ? Q.ensureAccounts(this.data) : []).forEach(u => this.put('users', u)); },
+  /* with the server, data upgrades are written only by an administrator's session (others are not allowed to write those records) */
+  canMigrate() { if (!this.remote) return true; const u = (this.data.users || []).find(x => x.id === Q._sessionUser); return !!u && ['admin', 'director'].includes(u.role); },
+  ensureAccounts() { if (!this.canMigrate()) return; (Q.ensureAccounts ? Q.ensureAccounts(this.data) : []).forEach(u => this.put('users', u)); },
+  /* quality-management modules added later (policies, complaints, rounds): fill demo data once on demo data sets */
+  ensureQuality() { if (!this.canMigrate()) return; const add = Q.ensureQuality ? Q.ensureQuality(this.data) : null; if (!add) return; add.forEach(([c, o]) => this.put(c, o)); this.save('settings'); },
   /* ordered write to the server; failures surface as a toast */
   send(key, method, path, body, headers) {
     this.inflight[key] = (this.inflight[key] || 0) + 1;
@@ -135,6 +146,7 @@ Q.db = {
         const skip = k => this.inflight[k] || (this.acked[k] || 0) > r.rev;
         r.docs.forEach(({col, doc}) => { const k = col + '|' + doc.id; if (skip(k)) return; const a = this.all(col), i = a.findIndex(x => x.id === doc.id);
           if (i < 0) { a.push(doc); changed = true; } else if (JSON.stringify(a[i]) !== JSON.stringify(doc)) { a[i] = doc; changed = true; } });
+        (r.hidden || []).forEach(({col, id}) => { (this.hidden[col] = this.hidden[col] || new Set()).add(id); const a = this.all(col), i = a.findIndex(x => x.id === id); if (i >= 0) { a.splice(i, 1); changed = true; } });
         r.deleted.forEach(({col, id}) => { if (skip(col + '|' + id)) return; const a = this.all(col), i = a.findIndex(x => x.id === id); if (i >= 0) { a.splice(i, 1); changed = true; } });
         Object.entries(r.prefs).forEach(([k, v]) => { if (!skip('pref|' + k) && JSON.stringify(this.prefs[k]) !== JSON.stringify(v)) { this.prefs[k] = v; changed = true; } });
         if (r.settings && !skip('settings') && JSON.stringify(r.settings) !== JSON.stringify(this.data.settings)) { this.data.settings = Object.assign(Q.defaultSettings(), r.settings); changed = true; }
@@ -180,9 +192,14 @@ Q.upref = {
 /* re-render after background changes, unless the user is in the middle of typing or a dialog */
 Q.refresh = () => { if (Q.me && Q.render && !document.querySelector('#modal').open && !document.activeElement.matches('input,textarea,select')) Q.render(); };
 Q.S = () => Q.db.data.settings;
+/* every id in a collection, including records hidden from this user, for numbering new records */
+Q.idObjs = col => { const h = (Q.db.hidden || {})[col], a = Q.db.all(col); return h && h.size ? a.concat([...h].map(id => ({id}))) : a; };
 Q.defaultSettings = () => ({
   facility: {ar: 'مستشفى السلام التخصصي', en: 'Al Salam Specialist Hospital'},
   supervisorHours: 24, reviewDays: 3, externalHours: 24, rcaMeetingDays: 5, rcaReportDays: 30, closureDays: 45, rcaThreshold: 15,
+  complaintDays: 7, complaintUrgentDays: 2, policyReviewYears: 3, policyAlertDays: 60, roundTarget: 90,
+  ackDays: 30, capaEsc1Days: 1, capaEsc2Days: 14, sfdaDays: 10,
+  rpnThreshold: 100, cultureLowPct: 60, patientLowScore: 3, pmEscDays: 30, drillsPerYear: 4, drillTargetMin: 5, docAuditTarget: 90, kpiSpecialCause: true,
   surveyDate: null
 });
 
@@ -202,28 +219,8 @@ Q.ROLES = {
   reporter: ['موظف', 'Staff member'], supervisor: ['مشرف قسم', 'Department supervisor'], qps: ['أخصائي جودة', 'Quality specialist'],
   director: ['مدير الجودة', 'Quality director'], biomed: ['الهندسة الطبية', 'Biomedical engineering'], admin: ['مدير النظام', 'System admin']
 };
-const P = {
-  'incident.all': ['qps', 'director', 'admin'],
-  'incident.review': ['qps', 'director'],
-  'incident.close': ['qps', 'director'],
-  'incident.supervise': ['supervisor', 'qps', 'director'],
-  'rca.view': ['qps', 'director', 'supervisor', 'biomed'],
-  'rca.edit': ['qps', 'director'],
-  'capa.view': ['qps', 'director', 'supervisor', 'biomed', 'admin'],
-  'capa.create': ['qps', 'director', 'supervisor'],
-  'capa.verify': ['qps', 'director'],
-  'kpi.view': ['qps', 'director', 'supervisor', 'admin'],
-  'kpi.enter': ['qps', 'director', 'supervisor'],
-  'kpi.define': ['qps', 'director'],
-  'cbahi.view': ['qps', 'director', 'supervisor', 'admin', 'biomed'],
-  'cbahi.edit': ['qps', 'director'],
-  'cbahi.upload': ['qps', 'director', 'supervisor', 'biomed'],
-  'device.view': ['biomed', 'admin', 'director', 'qps', 'supervisor'],
-  'device.edit': ['biomed', 'admin', 'director'],
-  'reports.view': ['qps', 'director', 'admin'],
-  'admin': ['admin', 'director'],
-  'dashboard': ['qps', 'director', 'admin', 'supervisor', 'biomed']
-};
+/* one permission table for the page and the server (js/perms.js) */
+const P = window.QPERMS || {};
 Q.me = null;
 /* role grants a permission unless the user carries a personal restriction (u.deny), e.g. ['admin'] */
 Q.can = (perm, u = Q.me) => !!u && (P[perm] || []).includes(u.role) && !(u.deny || []).includes(perm);
@@ -245,6 +242,8 @@ Q.sha256 = str => {
   return H.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
 };
 Q.pwHash = (userId, pw) => Q.sha256(`${userId}:${pw}`);
+/* e-signatures: with the server, the password is checked there (hashes never reach the browser) */
+Q.verifyPassword = async pw => { if (!Q.db.remote) return Q.checkPassword(Q.me, pw); const r = await fetch(`${API}/verify`, {method: 'POST', headers: Q.auth({'Content-Type': 'application/json'}), body: JSON.stringify({password: pw})}); return r.ok; };
 /* private accounts have their own password; shared demo accounts use "demo" */
 Q.checkPassword = (u, pw) => u.pwHash ? Q.pwHash(u.id, pw) === u.pwHash : pw === 'demo';
 Q.canSeeIncident = (x, u = Q.me) => {
@@ -282,11 +281,17 @@ Q.AFFECTED = {in: ['مريض منوّم', 'Inpatient'], out: ['مريض عياد
 Q.CLASS = {incident: ['حادثة', 'Incident'], near: ['حدث وشيك', 'Near miss'], sentinel: ['حدث جسيم', 'Sentinel event']};
 Q.STAGES = {new: ['بانتظار تعليق المشرف', 'Awaiting supervisor'], review: ['مراجعة الجودة', 'QPS review'], rca: ['تحليل السبب الجذري', 'Root cause analysis'], action: ['تنفيذ الإجراءات', 'Actions in progress'], closed: ['مغلق', 'Closed']};
 Q.STAGE_ORDER = ['new', 'review', 'rca', 'action', 'closed'];
-Q.FLOW = [['الإبلاغ', 'Reported'], ['تعليق المشرف', 'Supervisor'], ['مراجعة الجودة', 'QPS review'], ['تحليل RCA', 'RCA'], ['الإجراءات', 'Actions'], ['الإغلاق', 'Closed']];
+/* OVR lifecycle as the quality department runs it: register → analyse → action → follow-up → close */
+Q.FLOW = [['الإبلاغ', 'Reported'], ['تعليق المشرف', 'Supervisor'], ['مراجعة الجودة', 'QPS review'], ['تحليل RCA', 'RCA'], ['الإجراءات والمتابعة', 'Actions & follow-up'], ['الإغلاق', 'Closed']];
 
 Q.sal = x => x.review ? x.review.sev * x.review.lik : null;
 Q.isSentinel = x => (x.review ? x.review.classification === 'sentinel' : !!x.reporterSentinel);
-Q.needsRCA = x => Q.isSentinel(x) || (Q.sal(x) || 0) >= Q.S().rcaThreshold;
+/* MED-01: medication errors carry stage, drug, error type and NCC MERP harm category; categories E–I mean harm and require an RCA */
+Q.MED_STAGE = {prescribing: ['الوصف', 'Prescribing'], transcribing: ['النسخ', 'Transcribing'], dispensing: ['الصرف', 'Dispensing'], administration: ['الإعطاء', 'Administration'], monitoring: ['المراقبة', 'Monitoring']};
+Q.MED_TYPE = {drug: ['دواء خاطئ', 'Wrong drug'], dose: ['جرعة خاطئة', 'Wrong dose'], patient: ['مريض خاطئ', 'Wrong patient'], route: ['طريق خاطئ', 'Wrong route'], time: ['توقيت خاطئ أو جرعة فائتة', 'Wrong time / omission'], allergy: ['حساسية معروفة', 'Known allergy'], other: ['أخرى', 'Other']};
+Q.NCC = {A: ['ظروف قد تؤدي لخطأ', 'Circumstances capable of error'], B: ['خطأ لم يصل للمريض', 'Error did not reach patient'], C: ['وصل دون ضرر', 'Reached, no harm'], D: ['وصل واحتاج مراقبة', 'Reached, monitoring needed'], E: ['ضرر مؤقت احتاج تدخلًا', 'Temporary harm, intervention'], F: ['ضرر مؤقت أطال التنويم', 'Temporary harm, prolonged stay'], G: ['ضرر دائم', 'Permanent harm'], H: ['تدخل لإنقاذ الحياة', 'Intervention to sustain life'], I: ['وفاة', 'Death']};
+Q.nccHarm = c => ['E', 'F', 'G', 'H', 'I'].includes(c);
+Q.needsRCA = x => Q.isSentinel(x) || (Q.sal(x) || 0) >= Q.S().rcaThreshold || (!!x.med && Q.nccHarm(x.med.ncc));
 Q.band = x => { const s = Q.sal(x); if (Q.isSentinel(x)) return 'crit'; if (s == null) return 'mute'; return s >= Q.S().rcaThreshold ? 'crit' : s >= 6 ? 'med' : 'low'; };
 Q.bandLabel = x => { const s = Q.sal(x); if (Q.isSentinel(x)) return L('جسيم', 'Sentinel'); if (s == null) return L('لم يُقيّم', 'Not rated'); return s >= Q.S().rcaThreshold ? L('عالٍ', 'High') : s >= 6 ? L('متوسط', 'Moderate') : L('منخفض', 'Low'); };
 Q.salChip = x => { const s = Q.sal(x); return `<span class="chip ${Q.band(x)}">${s != null ? `<span class="num" style="font-weight:700">${s}</span>` : ''}${Q.bandLabel(x)}</span>`; };
@@ -376,14 +381,54 @@ Q.tasks = (u = Q.me) => {
     if (missing.length) push({kind: 'kpi', ref: last, what: [`إدخال مؤشرات ${Q.MON.ar[+last.slice(5) - 1]}`, `Enter ${Q.MON.enL[+last.slice(5) - 1]} indicators`], due: new Date(now.getFullYear(), now.getMonth(), 10, 17), prio: 3, link: `#/indicators/entry/${last}`, sub: L(`${missing.length} مؤشرات ناقصة`, `${missing.length} missing`)});
   }
   if (Q.can('cbahi.upload', u)) Q.db.all('standards').forEach(s => s.elements.forEach(e => {
+    if (e.ownerId === u.id && Q.elExpired(e)) push({kind: 'cbahi', ref: s.id + ':exp:' + e.id, what: ['تجديد دليل اعتماد منتهي الصلاحية', 'Renew expired accreditation evidence'], due: e.validUntil, prio: 2, link: `#/cbahi/${s.id}`, sub: `${s.id} · ${T(e.text)}`});
     if (e.ownerId === u.id && e.status === 'missing') push({kind: 'cbahi', ref: s.id, what: ['إرفاق دليل اعتماد', 'Upload accreditation evidence'], due: e.due || null, prio: 4, link: `#/cbahi/${s.id}`, sub: `${s.id} · ${T(e.text)}`});
     if (Q.can('cbahi.edit', u) && e.status === 'uploaded') push({kind: 'cbahi', ref: s.id, what: ['مراجعة دليل مرفوع', 'Review uploaded evidence'], due: null, prio: 4, link: `#/cbahi/${s.id}`, sub: `${s.id} · ${T(e.text)}`});
   }));
+  /* PSI-01: a high-harm report reaches quality straight away, not only after the supervisor comment */
+  if (['qps', 'director'].includes(u.role)) Q.db.all('incidents').forEach(x => {
+    if (x.stage === 'new' && Q.HIGH_HARM.includes(x.harm) && !Q.isSentinel(x)) push({kind: 'incident', ref: x.id, what: ['تنبيه مبكر: بلاغ بضرر متوسط أو أعلى', 'Early alert: report with moderate or worse harm'], due: Q.add(x.reportedAt, 4 * HOUR), prio: 0, link: `#/incidents/${x.id}`, sub: Q.tname(x.typeId) + ' · ' + Q.dshort(x.deptId)});
+  });
+  /* FAC-04: serious device cases must be reported to the regulator (SFDA) */
+  if (['biomed', 'qps', 'director'].includes(u.role)) Q.db.all('incidents').filter(Q.needsSFDA).forEach(x =>
+    push({kind: 'incident', ref: x.id, what: ['إبلاغ الجهة الرقابية (SFDA) عن حادث جهاز', 'Report a device incident to the regulator (SFDA)'], due: Q.sfdaDue(x), prio: 0, link: `#/incidents/${x.id}`, sub: (x.deviceTag || Q.tname(x.typeId)) + ' · ' + Q.dshort(x.deptId)}));
+  /* PSI-03: escalation ladder for overdue corrective actions: owner → department head → quality director */
+  Q.db.all('capa').forEach(c => { const lv = Q.capaEscLevel(c); if (!lv || c.ownerId === u.id) return;
+    const head = (Q.dept(c.deptId) || {}).headId;
+    if (head === u.id) push({kind: 'capa', ref: c.id + ':esc1', what: ['تصعيد: إجراء تصحيحي متأخر في قسمك', 'Escalation: overdue corrective action in your department'], due: c.due, prio: 1, link: `#/capa/${c.id}`, sub: `${Q.uname(c.ownerId)} · ${c.title}`});
+  });
+  /* when the owner is the department head, the next rung is the quality director straight away; the director gets one rolled-up task */
+  if (u.role === 'director') { const esc = Q.db.all('capa').filter(c => { const lv = Q.capaEscLevel(c), head = (Q.dept(c.deptId) || {}).headId; return lv && c.ownerId !== u.id && head !== u.id && (lv >= 2 || head === c.ownerId || !head); });
+    if (esc.length) push({kind: 'capa', ref: 'esc2', what: ['تصعيد: إجراءات تصحيحية متأخرة وصلت إليك', 'Escalated to you: overdue corrective actions'], due: esc.map(c => c.due).sort()[0], prio: 0, link: '#/capa?tab=late', sub: L(`${esc.length} إجراءات · أقدمها متأخر ${Q.nDays(Math.max(...esc.map(Q.capaLateDays)))}`, `${esc.length} actions · oldest ${Math.max(...esc.map(Q.capaLateDays))} days late`)}); }
+  /* FAC-01: incomplete device records */
+  if (u.role === 'biomed') { const inc = Q.db.all('devices').filter(d => d.status !== 'retired' && Q.devMissing(d).length);
+    if (inc.length) push({kind: 'device', ref: 'records', what: ['استكمال بيانات سجل الأجهزة', 'Complete device register records'], due: null, prio: 3, link: '#/devices?f=incomplete', sub: L(`${inc.length} أجهزة ببيانات ناقصة`, `${inc.length} devices with missing data`)}); }
+  /* indicators off target two months in a row need a documented action plan */
+  if (Q.can('kpi.enter', u)) Q.db.all('kpis').filter(k => k.active !== false && Q.canEnterKPI(k, u) && Q.kNeedsPlan(k)).forEach(k =>
+    push({kind: 'kpi', ref: k.id, what: ['خطة تحسين لمؤشر خارج الحد شهرين متتاليين', 'Action plan for an indicator off target 2 months running'], due: null, prio: 2, link: `#/indicators/${k.id}`, sub: T(k.name)}));
+  if (Q.kSpecial && Q.can('kpi.enter', u)) Q.db.all('kpis').filter(k => k.active !== false && Q.canEnterKPI(k, u) && !Q.kPlan(k) && Q.kSpecial(k)).forEach(k =>
+    push({kind: 'kpi', ref: k.id + ':sc', what: ['تحقيق في سبب خاص بمخطط التحكم', 'Investigate a control-chart special cause'], due: null, prio: 2, link: `#/indicators/${k.id}`, sub: T(k.name)}));
+  if (Q.kPendingFor) Q.db.all('kpis').filter(k => Q.kPendingFor(k, u)).forEach(k => push({kind: 'kpi', ref: k.id + ':def', what: ['اعتماد تعديل تعريف مؤشر', 'Approve an indicator definition change'], due: null, prio: 3, link: `#/indicators/${k.id}`, sub: k.code}));
+  if (Q.qualityTasks) Q.qualityTasks(u, push);
+  if (Q.phase2Tasks) Q.phase2Tasks(u, push);
+  if (Q.phase3Tasks) Q.phase3Tasks(u, push);
   return out.sort((a, b) => a.prio - b.prio || ((a.due ? +Q.d(a.due) : 9e15) - (b.due ? +Q.d(b.due) : 9e15)));
 };
 
 /* ---------- devices ---------- */
 Q.nextPM = d => d.lastPM ? new Date(new Date(d.lastPM).setMonth(new Date(d.lastPM).getMonth() + (d.pmMonths || 6))) : null;
+/* FAC-01: a complete inventory record has asset ID, model, location, risk class and warranty */
+Q.DEV_FIELDS = {model: ['الطراز', 'Model'], location: ['الموقع', 'Location'], serial: ['الرقم التسلسلي', 'Serial'], riskClass: ['فئة الخطورة', 'Risk class'], warrantyUntil: ['نهاية الضمان', 'Warranty end']};
+Q.devMissing = d => Object.keys(Q.DEV_FIELDS).filter(k => !d[k]);
+Q.devCompletePct = (list = Q.db.all('devices').filter(d => d.status !== 'retired')) => list.length ? Math.round(list.filter(d => !Q.devMissing(d).length).length / list.length * 100) : null;
+/* FAC-04: device incidents with moderate or worse harm (or severity ≥ 3) need a regulator report */
+Q.HIGH_HARM = ['mod', 'serious', 'death'];
+Q.isDeviceCase = x => !!x.deviceTag || (Q.db.get('types', x.typeId) || {}).cat === 'device';
+Q.needsSFDA = x => Q.isDeviceCase(x) && !x.sfda && (x.stage !== 'closed' || new Date(x.reportedAt) > Q.add(Q.now(), -90 * DAY)) && (Q.HIGH_HARM.includes(x.harm) || (x.review && x.review.sev >= 3) || !!x.deviceSerious);
+Q.sfdaDue = x => Q.add(x.reportedAt, Q.S().sfdaDays * DAY);
+/* PSI-03: overdue escalation ladder */
+Q.capaLateDays = c => ['open', 'progress'].includes(c.status) && new Date(c.due) < Q.now() ? Math.ceil((Q.now() - new Date(c.due)) / DAY) : 0;
+Q.capaEscLevel = c => { const d = Q.capaLateDays(c); return d >= Q.S().capaEsc2Days ? 2 : d >= Q.S().capaEsc1Days ? 1 : 0; };
 
 /* ---------- KPI maths ---------- */
 Q.kVal = (k, v) => { if (!v || v.den === 0 && k.unit !== 'count') return null; const n = +v.num, d = +v.den;
@@ -397,13 +442,77 @@ Q.kFmt = (k, val, small = true) => { if (val == null) return '—'; const r = Ma
 Q.kTarget = k => { const u = k.unit === 'pct' ? '%' : k.unit === 'per1000' ? '‰' : k.unit === 'days' ? L(' أيام', ' days') : '';
   return k.dir === 'up' ? L(`≥ ${k.target}${u}`, `≥ ${k.target}${u}`) : (k.target === 0 ? `0${u}` : `≤ ${k.target}${u}`); };
 Q.K_ST = {ok: ['ضمن الهدف', 'On target'], med: ['تحت المراقبة', 'Watch'], crit: ['خارج الحد', 'Breach'], mute: ['لا توجد بيانات', 'No data']};
+/* how many of the most recent recorded months (ending last month) are in breach, back to back */
+Q.kBreachRun = k => { let m = Q.ymAdd(Q.ym(Q.now()), -1), n = 0;
+  for (let i = 0; i < 12; i++, m = Q.ymAdd(m, -1)) { const v = Q.kVal(k, Q.db.get('kpiValues', `${k.id}:${m}`)); if (v == null) { if (i === 0) continue; break; } if (Q.kState(k, v) !== 'crit') break; n++; }
+  return n; };
+Q.kPlan = k => Q.db.all('capa').find(c => c.kpiId === k.id && !['verified', 'cancelled'].includes(c.status)) || null;
+Q.kNeedsPlan = k => Q.kBreachRun(k) >= 2 && !Q.kPlan(k);
 
 /* ---------- CBAHI maths ---------- */
-Q.stdState = s => { const miss = s.elements.filter(e => e.status === 'missing').length, appr = s.elements.filter(e => e.status === 'approved').length;
-  if (appr === s.elements.length) return 'ok'; if (miss && s.priority === 'high') return 'crit'; return 'med'; };
-Q.readiness = (list = Q.db.all('standards')) => { const r = {ok: 0, med: 0, crit: 0, total: 0};
-  list.forEach(s => s.elements.forEach(e => { r.total++; if (e.status === 'approved') r.ok++; else if (e.status === 'uploaded') r.med++; else r.crit++; }));
+/* approved evidence that has passed its validity date no longer counts */
+Q.elExpired = e => e.status === 'approved' && !!e.validUntil && new Date(e.validUntil) < Q.now();
+Q.elState = e => Q.elExpired(e) ? 'expired' : e.status;
+/* AUD-04 self-assessment rating per element; when not rated yet it follows the evidence status */
+Q.EL_RATE = {met: ['مستوفى', 'Met', 'ok'], partial: ['مستوفى جزئيًا', 'Partially met', 'med'], not: ['غير مستوفى', 'Not met', 'crit'], na: ['لا ينطبق', 'N/A', 'mute']};
+Q.elRating = e => Q.elExpired(e) ? 'not' : e.rating || (e.status === 'approved' ? 'met' : e.status === 'uploaded' ? 'partial' : 'not');
+Q.metPct = list => { let n = 0, got = 0; list.forEach(s => s.elements.forEach(e => { const r = Q.elRating(e); if (r === 'na') return; n++; got += r === 'met' ? 1 : r === 'partial' ? .5 : 0; })); return n ? Math.round(got / n * 100) : null; };
+Q.esrGaps = () => Q.db.all('standards').filter(s => s.esr && s.elements.some(e => !['met', 'na'].includes(Q.elRating(e))));
+Q.stdState = s => { const st = s.elements.map(Q.elState), miss = st.filter(x => x === 'missing' || x === 'expired').length, appr = st.filter(x => x === 'approved').length;
+  if (s.elements.length && appr === s.elements.length) return 'ok'; if (miss && s.priority === 'high') return 'crit'; return 'med'; };
+Q.readiness = (list = Q.db.all('standards')) => { const r = {ok: 0, med: 0, crit: 0, total: 0, expired: 0};
+  list.forEach(s => s.elements.forEach(e => { r.total++; const st = Q.elState(e); if (st === 'approved') r.ok++; else if (st === 'uploaded') r.med++; else { r.crit++; if (st === 'expired') r.expired++; } }));
   r.pct = r.total ? Math.round(r.ok / r.total * 100) : 0; return r; };
+
+/* system readiness for a CBAHI survey: evidence on file is only half the picture; surveyors trace whether the quality system runs.
+   evidence (weighted: high-priority standards count double) = 50%, operational dimensions share the other 50%.
+   blockers make the facility "not survey-ready" whatever the percentage. */
+Q.readinessIndex = () => {
+  const now = Q.now(), since = Q.add(now, -90 * DAY), S = Q.S(), pct = (a, b) => b ? Math.round(a / b * 100) : null;
+  let w = 0, got = 0; Q.db.all('standards').forEach(s => s.elements.forEach(e => { const wt = s.priority === 'high' ? 2 : 1; w += wt; if (Q.elState(e) === 'approved') got += wt; }));
+  const dims = [];
+  const add = (key, t, val, detail, go) => dims.push({key, t, val, detail, go});
+  add('evidence', ['أدلة المعايير (مرجّحة بالأولوية)', 'Standards evidence (priority-weighted)'], pct(got, w), L('العناصر عالية الأولوية تُحتسب مضاعفة', 'High-priority elements count double'), '#/cbahi');
+  const pols = Q.db.all('policies').filter(p => p.live && p.status !== 'archived');
+  add('policies', ['سياسات سارية وغير متأخرة المراجعة', 'Policies current (review not overdue)'], pct(pols.filter(p => !p.reviewDue || new Date(p.reviewDue) >= now).length, pols.length), L(`${pols.length} سياسة معتمدة`, `${pols.length} approved policies`), '#/policies');
+  const rds = Q.db.all('rounds').filter(r => new Date(r.plannedAt) >= since && new Date(r.plannedAt) <= now && r.status !== 'cancelled');
+  const doneR = rds.filter(r => r.status === 'done');
+  add('rounds', ['تنفيذ جولات الجودة المجدولة (90 يومًا)', 'Scheduled quality rounds completed (90 d)'], pct(doneR.length, rds.length), doneR.length ? L(`متوسط الامتثال ${Math.round(doneR.reduce((a, r) => a + (r.score || 0), 0) / doneR.length)}%`, `average compliance ${Math.round(doneR.reduce((a, r) => a + (r.score || 0), 0) / doneR.length)}%`) : '', '#/rounds');
+  const cmp = Q.db.all('complaints').filter(c => new Date(c.receivedAt) >= since);
+  const cmpOk = cmp.filter(c => c.response ? new Date(c.response.at) <= new Date(c.due) : new Date(c.due) >= now);
+  add('complaints', ['الرد على الشكاوى ضمن المهلة (90 يومًا)', 'Complaints answered within SLA (90 d)'], pct(cmpOk.length, cmp.length), L(`${cmp.length} شكوى`, `${cmp.length} complaints`), '#/complaints');
+  const capas = Q.db.all('capa').filter(c => ['open', 'progress', 'done'].includes(c.status));
+  add('capa', ['إجراءات تصحيحية غير متأخرة', 'Corrective actions not overdue'], pct(capas.filter(c => c.status === 'done' || new Date(c.due) >= now).length, capas.length), L(`${capas.length} إجراء نشط`, `${capas.length} active actions`), '#/capa');
+  const ovr = Q.db.all('incidents').filter(x => x.stage === 'closed' && x.closure && new Date(x.closure.at) >= since);
+  add('ovr', ['بلاغات OVR أُغلقت في الموعد (90 يومًا)', 'OVR reports closed on time (90 d)'], pct(ovr.filter(x => x.closure.onTime).length, ovr.length), L(`${ovr.length} بلاغ مغلق`, `${ovr.length} closed reports`), '#/incidents');
+  const kp = Q.db.all('kpis').filter(k => k.active !== false).map(k => Q.kVal(k, Q.db.get('kpiValues', `${k.id}:${Q.ymAdd(Q.ym(now), -1)}`)) != null ? Q.kState(k, Q.kVal(k, Q.db.get('kpiValues', `${k.id}:${Q.ymAdd(Q.ym(now), -1)}`))) : null).filter(Boolean);
+  add('kpi', ['مؤشرات ضمن الهدف (الشهر الماضي)', 'Indicators on target (last month)'], pct(kp.filter(s => s === 'ok').length, kp.length), L(`${kp.length} مؤشر بقيمة مُدخلة`, `${kp.length} indicators with data`), '#/indicators');
+  const extraBlockers = []; if (Q.extraReadiness) Q.extraReadiness(add, extraBlockers); if (Q.extraReadiness3) Q.extraReadiness3(add, extraBlockers);
+  const ops = dims.slice(1).filter(d => d.val != null);
+  const opsAvg = ops.length ? ops.reduce((a, d) => a + d.val, 0) / ops.length : null;
+  const ev = dims[0].val == null ? 0 : dims[0].val;
+  const score = Math.round(opsAvg == null ? ev : ev * .5 + opsAvg * .5);
+  /* blockers */
+  const blockers = [];
+  const highGaps = Q.db.all('standards').filter(s => s.priority === 'high' && s.elements.some(e => ['missing', 'expired'].includes(Q.elState(e))));
+  if (highGaps.length) blockers.push({t: L(`${highGaps.length} معايير عالية الأولوية بها أدلة ناقصة أو منتهية`, `${highGaps.length} high-priority standards with missing or expired evidence`), go: '#/cbahi?tab=crit'});
+  const esr = Q.esrGaps();
+  if (esr.length) blockers.push({t: L(`${esr.length} متطلبات سلامة أساسية (ESR) غير مستوفاة بالكامل`, `${esr.length} essential safety requirement(s) (ESR) not fully met`), go: '#/cbahi?tab=esr'});
+  const sfda = Q.db.all('incidents').filter(Q.needsSFDA);
+  if (sfda.length) blockers.push({t: L(`${sfda.length} حادث جهاز جسيم دون بلاغ للجهة الرقابية`, `${sfda.length} serious device incident(s) not reported to the regulator`), go: '#/incidents'});
+  const sent = Q.db.all('incidents').filter(x => x.stage !== 'closed' && Q.isSentinel(x) && !x.external);
+  if (sent.length) blockers.push({t: L(`${sent.length} حدث جسيم دون إخطار خارجي`, `${sent.length} sentinel event(s) without external notice`), go: '#/incidents'});
+  const lateRca = Q.db.all('incidents').filter(x => x.stage === 'rca' && Q.add(x.reportedAt, S.rcaReportDays * DAY) < now);
+  if (lateRca.length) blockers.push({t: L(`${lateRca.length} تحقيق RCA تجاوز مهلة ${S.rcaReportDays} يومًا`, `${lateRca.length} RCA(s) past the ${S.rcaReportDays}-day limit`), go: '#/rca'});
+  const odPol = pols.filter(p => p.reviewDue && new Date(p.reviewDue) < now);
+  if (odPol.length) blockers.push({t: L(`${odPol.length} سياسات تجاوزت موعد المراجعة`, `${odPol.length} policies past their review date`), go: '#/policies?tab=overdue'});
+  const lateCmp = Q.db.all('complaints').filter(c => !['responded', 'closed'].includes(c.status) && new Date(c.due) < now);
+  if (lateCmp.length) blockers.push({t: L(`${lateCmp.length} شكاوى متأخرة الرد`, `${lateCmp.length} complaint(s) overdue for response`), go: '#/complaints?tab=late'});
+  blockers.push(...extraBlockers);
+  const level = blockers.length ? 'crit' : score >= 85 ? 'ok' : 'med';
+  return {score, evidence: ev, ops: opsAvg == null ? null : Math.round(opsAvg), dims, blockers, level,
+    verdict: level === 'ok' ? ['جاهز للزيارة', 'Survey-ready'] : level === 'med' ? ['يحتاج استكمالًا', 'Needs work'] : ['غير جاهز للزيارة', 'Not survey-ready']};
+};
 
 /* ---------- UI: toast, modal, confirm, menus ---------- */
 Q.toast = (msg, kind = 'ok') => { const t = Q.$('#toast'); t.className = 'toast on ' + kind; t.innerHTML = Q.ic(kind === 'err' ? 'alert' : 'check', 'sm') + `<span>${msg}</span>`; clearTimeout(Q.toast.t); Q.toast.t = setTimeout(() => t.classList.remove('on'), 3400); };

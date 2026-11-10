@@ -6,7 +6,8 @@ const REF = new Date('2026-09-29T11:50:00+03:00');
 
 /* private accounts shipped with the app: own password (stored as SHA-256 of "<id>:<password>"), never listed as demo accounts.
    Q.ensureAccounts adds any that are missing to new and existing data; it never overwrites an account an admin has edited. */
-Q.ACCOUNTS = [];
+/* real accounts live in js/accounts.local.js, which is git-ignored, so no email or password hash reaches the public repository */
+Q.ACCOUNTS = window.QLOCAL_ACCOUNTS || [];
 Q.ensureAccounts = data => {
   const users = data.users || (data.users = []), added = [];
   Q.ACCOUNTS.forEach(a => { if (users.some(u => u.id === a.id || String(u.email || '').toLowerCase() === a.email)) return;
@@ -329,6 +330,7 @@ Q.seed = (data) => {
     if (x.closure) A('incident', x.id, 'closed', x.closure.by, x.closure.at);
   });
   (data.capa || []).forEach(c => A('capa', c.id, 'created', c.createdBy, c.createdAt));
+  if (Q.seedQuality) { Q.seedQuality(data); Q.phase1Patch(data, true); if (Q.phase2Patch) Q.phase2Patch(data, true); if (Q.phase3Patch) Q.phase3Patch(data, true); }
   Q.bilingualize(data);
 };
 

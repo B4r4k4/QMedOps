@@ -90,6 +90,8 @@ function detailView(id) {
     ${n ? `<div class="next"><div><small>${L('الخطوة التالية', 'Next step')}</small><b>${T(n.what)}</b></div><span class="due ${r.cls}">${r.txt}</span><span class="muted nowrap">${L('المهلة', 'Due')} ${Q.fDate(n.due)}</span></div>` : x.closure ? `<div class="next ok"><div><small>${L('أُغلق', 'Closed')}</small><b>${Q.fDate(x.closure.at)} · ${Q.uname(x.closure.by)}</b></div><span class="chip ${x.closure.onTime ? 'ok' : 'med'}">${x.closure.onTime ? L('ضمن المهلة', 'On time') : L('بعد المهلة', 'Late')}</span></div>` : ''}
   </div></section>
   ${x.clarify && x.clarify.open ? `<div class="banner info"><div class="ico">${ic('info')}</div><div><b>${L('طلب إيضاح من المشرف', 'Clarification requested by the supervisor')}</b><p>${esc(x.clarify.text)} · ${esc(Q.uname(x.clarify.by))} · ${Q.ago(x.clarify.at)}</p></div>${x.reporterId === Q.me.id ? `<div class="act"><button class="btn btn-p sm" data-act="inc-tab" data-v="comments">${L('الرد في النقاش', 'Reply in discussion')}</button></div>` : ''}</div>` : ''}
+  ${Q.needsSFDA(x) ? `<div class="banner"><div class="ico">${ic('device')}</div><div><b>${L('حادث جهاز جسيم: يلزم إبلاغ الجهة الرقابية (SFDA)', 'Serious device incident: regulator (SFDA) report required')}</b><p>${L('المهلة', 'Due')} ${Q.fDate(Q.sfdaDue(x), false)} · <span class="due ${Q.rel(Q.sfdaDue(x)).cls}">${Q.rel(Q.sfdaDue(x)).txt}</span> · ${L('لا يُغلق البلاغ قبل تسجيله، ويلزم إجراء تصحيحي.', 'The report cannot close before it is logged, and a corrective action is required.')}</p></div>${['biomed', 'qps', 'director'].includes(Q.me.role) ? `<div class="act"><button class="btn btn-d sm" data-act="inc-sfda" data-id="${x.id}">${ic('send', 'sm')}${L('تسجيل البلاغ الرقابي', 'Log regulator report')}</button></div>` : ''}</div>` : ''}
+  ${x.sfda ? `<div class="banner ok"><div class="ico">${ic('check')}</div><div><b>${L('أُبلغت الجهة الرقابية', 'Regulator notified')}</b><p><span class="ltr">${esc(x.sfda.ref)}</span> · ${Q.fDate(x.sfda.at)} · ${esc(Q.uname(x.sfda.by))}${x.sfda.note ? ' · ' + esc(x.sfda.note) : ''}</p></div></div>` : Q.isDeviceCase(x) && !Q.needsSFDA(x) && x.stage !== 'closed' && ['biomed', 'qps', 'director'].includes(Q.me.role) ? `<p class="hint" style="margin:-6px 0 12px">${L('حادث جهاز غير مصنف جسيمًا.', 'Device incident not classed as serious.')} <button class="btn-g" data-act="inc-dev-serious" data-id="${x.id}">${L('تصنيفه جسيمًا (يتطلب بلاغًا رقابيًا)', 'Flag as serious (needs regulator report)')}</button></p>` : ''}
   ${x.closure && x.reporterId === Q.me.id ? `<div class="banner ok"><div class="ico">${ic('check')}</div><div><b>${L('التغذية الراجعة على بلاغك', 'Feedback on your report')}</b><p class="pre">${esc(x.closure.feedback)}</p></div></div>` : ''}
   ${actionPanel(x, n, rca, capas)}
   <div class="detail">
@@ -98,6 +100,7 @@ function detailView(id) {
       ${tab === 'details' ? `<section class="card"><div class="card-b">
         <div class="sec"><h4>${L('وصف الحدث (وقائع فقط)', 'Description (facts only)')}</h4><p class="quote pre">${esc(x.desc)}</p></div>
         <div class="sec"><h4>${L('الإجراء الفوري المتخذ', 'Immediate action taken')}</h4><p class="pre">${esc(x.immediate || '—')}</p></div>
+        ${x.med ? `<div class="sec"><h4>${L('تفاصيل الخطأ الدوائي', 'Medication error details')}</h4><dl class="kv"><dt>${L('الدواء', 'Drug')}</dt><dd class="ltr">${esc(x.med.drug)}</dd><dt>${L('المرحلة', 'Stage')}</dt><dd>${T(Q.MED_STAGE[x.med.stage] || ['—', '—'])}</dd><dt>${L('النوع', 'Type')}</dt><dd>${T(Q.MED_TYPE[x.med.type] || ['—', '—'])}</dd><dt>NCC MERP</dt><dd><span class="chip ${Q.nccHarm(x.med.ncc) ? 'crit' : 'mute'}">${x.med.ncc}: ${T(Q.NCC[x.med.ncc])}</span>${Q.nccHarm(x.med.ncc) ? ` <small class="c-crit">${L('ضرر: يتطلب RCA', 'harm: RCA required')}</small>` : ''}</dd></dl></div>` : ''}
         ${x.attachments && x.attachments.length ? `<div class="sec"><h4>${L('المرفقات', 'Attachments')}</h4><ul class="files">${x.attachments.map(a => `<li>${ic('clip', 'sm')}<button class="btn-g" data-act="file-dl" data-id="${a.id}" data-name="${esc(a.name)}">${esc(a.name)}</button><small>${Q.fSize(a.size)}</small></li>`).join('')}</ul></div>` : ''}
       </div></section>` : ''}
       ${tab === 'review' ? `<section class="card"><div class="card-b">
@@ -115,7 +118,7 @@ function detailView(id) {
           <dt>${L('المسؤول عن المتابعة', 'Follow-up owner')}</dt><dd>${Q.uname(x.review.ownerId)}</dd>
           <dt>${L('ملاحظات الجودة', 'QPS notes')}</dt><dd class="pre">${esc(x.review.notes || '—')}</dd></dl>` : `<p class="muted">${L('لم تتم المراجعة بعد.', 'Not reviewed yet.')}</p>`}</div>
         ${x.external ? `<div class="sec"><h4>${L('الإخطار الخارجي', 'External notification')}</h4><dl class="kv"><dt>${L('الجهات', 'Bodies')}</dt><dd>${esc(x.external.to.join(' · '))}</dd><dt>${L('المرجع', 'Reference')}</dt><dd class="ltr">${esc(x.external.ref)}</dd><dt>${L('الوقت', 'Time')}</dt><dd>${Q.fDate(x.external.at)} · ${Q.uname(x.external.by)}</dd></dl></div>` : ''}
-        ${x.closure ? `<div class="sec"><h4>${L('الإغلاق والتغذية الراجعة', 'Closure & feedback')}</h4><p class="quote pre">${esc(x.closure.feedback)}</p>${x.closure.seenAt ? `<p class="hint">${L('اطّلع عليها المبلّغ', 'Read by reporter')} ${Q.fDate(x.closure.seenAt)}</p>` : ''}</div>` : ''}
+        ${x.closure ? `<div class="sec"><h4>${L('الإغلاق والتغذية الراجعة', 'Closure & feedback')}</h4><p class="quote pre">${esc(x.closure.feedback)}</p>${x.closure.noAction ? `<p class="hint"><b>${L('سبب عدم الحاجة لإجراء', 'No action needed because')}:</b> ${esc(x.closure.noAction)}</p>` : ''}${x.closure.followUp ? `<p class="hint"><b>${L('نتيجة المتابعة', 'Follow-up result')}:</b> ${esc(x.closure.followUp)}</p>` : ''}${x.closure.seenAt ? `<p class="hint">${L('اطّلع عليها المبلّغ', 'Read by reporter')} ${Q.fDate(x.closure.seenAt)}</p>` : ''}</div>` : ''}
         ${eocOpen ? `<div class="sec"><h4>${L('الجزء الخامس: ضابط سلامة المرضى والبيئة (إذا كان متعلقًا ببيئة الرعاية)', 'Part V: Patient/environmental safety officer (if related to EOC)')}</h4>${x.eoc ? `<dl class="kv">
           <dt>${L('الإبلاغ في الوقت المحدد', 'Notification on time')}</dt><dd>${x.eoc.onTime ? L('نعم', 'Yes') : L('لا', 'No')}</dd>
           <dt>${L('تحديد السبب الجذري', 'Root cause identified')}</dt><dd>${x.eoc.rc ? L('نعم', 'Yes') : L('لا', 'No')}</dd>
@@ -193,8 +196,11 @@ function panelAfterExternal(x, rca, capas) {
     if (open.length) return `<section class="card act-card"><div class="card-b row between"><div><b>${L(`${open.length} إجراءات قيد التنفيذ`, `${open.length} actions in progress`)}</b><p class="muted">${L('يُغلق البلاغ بعد التحقق من فعالية كل الإجراءات المرتبطة.', 'The report closes once every linked action is verified.')}</p></div>${Q.can('capa.create') ? `<button class="btn btn-s" data-act="capa-new" data-inc="${x.id}">${ic('plus')}${L('إجراء جديد', 'New action')}</button>` : ''}</div></section>`;
     if (!Q.can('incident.close')) return info(L('بانتظار إغلاق إدارة الجودة.', 'Awaiting QPS closure.'));
     return `<section class="card act-card"><div class="card-h"><div><h3>${L('إغلاق البلاغ', 'Close report')}</h3><p>${capas.length ? L('كل الإجراءات المرتبطة مُتحقق منها.', 'All linked actions are verified.') : L('لا توجد إجراءات مرتبطة. أضف إجراءً أو أغلق مع توثيق السبب.', 'No linked actions. Add one or close with a documented reason.')}</p></div>${Q.can('capa.create') ? `<button class="btn-g" data-act="capa-new" data-inc="${x.id}">${ic('plus', 'sm')}${L('إجراء', 'Action')}</button>` : ''}</div>
-      <form class="card-b" data-form="close" data-id="${x.id}"><div class="fgrid">${Q.f.area('feedback', L('التغذية الراجعة للمبلّغ والفريق', 'Feedback to reporter & staff'), '', {req: true, rows: 3, ph: L('ما الذي تغيّر نتيجة هذا البلاغ؟', 'What changed as a result of this report?')})}</div>
-      <div class="form-actions"><span class="muted">${new Date(Q.nextStep(x).due) >= Q.now() ? L('الإغلاق ضمن مهلة 45 يومًا', 'Within the 45-day window') : L('تجاوز مهلة الإغلاق', 'Past the closure window')}</span><button class="btn btn-p" type="submit">${ic('check')}${L('إغلاق البلاغ', 'Close report')}</button></div></form></section>`;
+      <form class="card-b" data-form="close" data-id="${x.id}"><div class="fgrid">
+        ${capas.length ? '' : Q.f.area('noAction', L('لماذا لا يلزم إجراء تصحيحي؟', 'Why is no corrective action needed?'), '', {req: true, rows: 2, ph: L('مثال: خطأ فردي عولج فورًا ولا يوجد خلل في النظام', 'e.g. isolated slip corrected on the spot; no system weakness found')})}
+        ${capas.length ? '' : Q.f.area('followUp', L('نتيجة المتابعة قبل الإغلاق', 'Follow-up result before closing'), '', {req: true, rows: 2, ph: L('ما الذي تحقّقت منه؟ هل تكرر الحدث؟', 'What did you check? Has it recurred?')})}
+        ${Q.f.area('feedback', L('التغذية الراجعة للمبلّغ والفريق', 'Feedback to reporter & staff'), '', {req: true, rows: 3, ph: L('ما الذي تغيّر نتيجة هذا البلاغ؟', 'What changed as a result of this report?')})}</div>
+      <div class="form-actions"><span class="muted">${new Date(Q.nextStep(x).due) >= Q.now() ? L(`الإغلاق ضمن مهلة ${Q.S().closureDays} يومًا`, `Within the ${Q.S().closureDays}-day window`) : L('تجاوز مهلة الإغلاق', 'Past the closure window')}</span><button class="btn btn-p" type="submit">${ic('check')}${L('إغلاق البلاغ', 'Close report')}</button></div></form></section>`;
   }
   return '';
 }
@@ -244,7 +250,7 @@ const FORMS = {
     x.review = {at: Q.iso(Q.now()), by: Q.me.id, sev, lik, classification: d.classification || 'incident', factors: d.factors || [], ownerId: d.ownerId, causesBy: d.causesBy, notes: d.notes};
     Q.audit('incident', x.id, 'reviewed', `SAL ${sev * lik}`); Q.audit('incident', x.id, 'assigned', Q.uname(d.ownerId));
     if (Q.needsRCA(x) || d.causesBy === 'rca') {
-      const n = Q.db.all('rca').reduce((m, r) => Math.max(m, +r.id.slice(-3)), 0) + 1;
+      const n = Q.idObjs('rca').reduce((m, r) => Math.max(m, +r.id.slice(-3)), 0) + 1;
       const rid = `RCA-${new Date().getFullYear()}-${String(n).padStart(3, '0')}`;
       Q.db.put('rca', {id: rid, incidentId: x.id, status: 'forming', leadId: d.ownerId, team: [...new Set([d.ownerId, Q.me.id])], createdAt: Q.iso(Q.now()), meetingAt: null, meetingPlan: Q.iso(Q.add(Q.now(), Q.S().rcaMeetingDays * Q.DAY)), events: [{id: Q.uid('e'), at: x.occurredAt, text: T(x.title), key: true}], whys: [], fish: {}, rootCause: ''});
       x.rcaId = rid; x.stage = 'rca'; Q.audit('incident', x.id, 'rca_opened', rid); Q.audit('rca', rid, 'created');
@@ -253,10 +259,23 @@ const FORMS = {
   },
   close(d, x) {
     const due = Q.nextStep(x).due;
-    x.closure = {at: Q.iso(Q.now()), by: Q.me.id, feedback: d.feedback, onTime: new Date(due) >= Q.now(), notify: true};
+    const cs = Q.db.all('capa').filter(c => c.incidentId === x.id && c.status !== 'cancelled');
+    if (Q.isDeviceCase(x) && (Q.needsSFDA(x) || (x.sfda && !cs.length))) { Q.toast(L('حادث جهاز جسيم: سجّل البلاغ الرقابي وأضف إجراءً تصحيحيًا قبل الإغلاق.', 'Serious device incident: log the regulator report and add a corrective action before closing.'), 'err'); return; }
+    if (cs.some(c => c.status !== 'verified')) { Q.toast(L('لا يُغلق البلاغ قبل التحقق من فعالية كل الإجراءات المرتبطة.', 'Verify every linked action before closing.'), 'err'); return; }
+    if (!cs.length && (!String(d.noAction || '').trim() || !String(d.followUp || '').trim())) { Q.toast(L('وثّق سبب عدم الحاجة لإجراء ونتيجة المتابعة.', 'Document why no action is needed and the follow-up result.'), 'err'); return; }
+    x.closure = {at: Q.iso(Q.now()), by: Q.me.id, feedback: d.feedback, noAction: cs.length ? null : d.noAction, followUp: cs.length ? null : d.followUp, onTime: new Date(due) >= Q.now(), notify: true};
     x.stage = 'closed'; Q.db.put('incidents', x); Q.audit('incident', x.id, 'closed'); Q.render(); Q.toast(L('أُغلق البلاغ وأُرسلت التغذية الراجعة', 'Report closed and feedback sent'));
   }
 };
+Q.act('inc-sfda', el => { const x = Q.db.get('incidents', el.dataset.id);
+  Q.modal({title: L('تسجيل البلاغ للجهة الرقابية', 'Log regulator report'), sub: `${x.id}${x.deviceTag ? ' · ' + x.deviceTag : ''}`, body: `<div class="fgrid">${Q.f.text('ref', L('رقم مرجع البلاغ', 'Report reference'), '', {req: true, ltr: true, ph: 'SFDA-MDS-…'})}${Q.f.text('at', L('تاريخ الإبلاغ', 'Reported on'), Q.toInput(Q.now()), {type: 'datetime-local', req: true})}
+    ${Q.f.sel('impact', L('الأثر على المريض', 'Patient impact'), [['none', L('لا أثر', 'None')], ['temp', L('ضرر مؤقت', 'Temporary harm')], ['perm', L('ضرر دائم', 'Permanent harm')], ['death', L('وفاة', 'Death')]], x.harm === 'death' ? 'death' : x.harm === 'serious' ? 'perm' : x.harm === 'mod' ? 'temp' : 'none')}
+    ${Q.f.chk('quarantine', L('عُزل الجهاز وأُوقف عن الاستخدام', 'Device quarantined and withdrawn from use'), true)}${Q.f.area('note', L('ملاحظات', 'Notes'), '', {rows: 2})}</div>`,
+    onSubmit: d => { x.sfda = {ref: d.ref, at: Q.fromInput(d.at), by: Q.me.id, impact: d.impact, quarantine: !!d.quarantine, note: d.note}; Q.db.put('incidents', x); Q.audit('incident', x.id, 'sfda', d.ref);
+      if (d.quarantine && x.deviceTag) { const dv = Q.db.get('devices', x.deviceTag); if (dv && !['down', 'retired'].includes(dv.status)) { dv.status = 'down'; Q.db.put('devices', dv); } }
+      Q.render(); Q.toast(L('سُجّل البلاغ الرقابي', 'Regulator report logged')); }}); });
+Q.act('inc-dev-serious', async el => { const x = Q.db.get('incidents', el.dataset.id); if (!await Q.confirm(L('تصنيف الحادث جسيمًا يتطلب بلاغًا للجهة الرقابية وإجراءً تصحيحيًا. متابعة؟', 'Flagging it serious requires a regulator report and a corrective action. Continue?'))) return;
+  x.deviceSerious = true; Q.db.put('incidents', x); Q.audit('incident', x.id, 'updated', 'serious device incident'); Q.render(); });
 Q.act('inc-reopen', async el => { const x = Q.db.get('incidents', el.dataset.id); if (!await Q.confirm(L('إعادة فتح البلاغ ستعيده لمرحلة تنفيذ الإجراءات. متابعة؟', 'Reopening returns the report to the action stage. Continue?'))) return;
   x.stage = 'action'; x.closure = null; Q.db.put('incidents', x); Q.audit('incident', x.id, 'reopened'); Q.render(); });
 Q.act('inc-return', el => { const x = Q.db.get('incidents', el.dataset.id);
@@ -277,7 +296,7 @@ Q.views.report = {render(parts) {
   if (editId && (!ex || !((ex.reporterId === Q.me.id && ex.stage === 'new') || Q.can('incident.review')))) return {title: L('غير مسموح', 'Not allowed'), html: Q.empty(L('لا يمكن تعديل هذا البلاغ.', 'This report cannot be edited.'), 'lock')};
   const key = 'draft:' + Q.me.id;
   if (!Q.form || Q.form._for !== (editId || 'new')) {
-    Q.form = ex ? {_for: editId, step: 1, typeId: ex.typeId, deptId: ex.deptId, title: T(ex.title), location: ex.location || '', occurredAt: Q.toInput(ex.occurredAt), affected: ex.affected, mrn: (ex.patient || {}).mrn || '', pname: (ex.patient || {}).name || '', age: (ex.patient || {}).age || '', sex: (ex.patient || {}).sex || '', physician: (ex.patient || {}).physician || '', diagnosis: (ex.patient || {}).diagnosis || '', desc: ex.desc, immediate: ex.immediate, anonymous: ex.anonymous, harm: ex.harm || '', sentinel: !!ex.reporterSentinel, deviceTag: ex.deviceTag || '', files: []}
+    Q.form = ex ? {_for: editId, step: 1, typeId: ex.typeId, deptId: ex.deptId, title: T(ex.title), location: ex.location || '', occurredAt: Q.toInput(ex.occurredAt), affected: ex.affected, mrn: (ex.patient || {}).mrn || '', pname: (ex.patient || {}).name || '', age: (ex.patient || {}).age || '', sex: (ex.patient || {}).sex || '', physician: (ex.patient || {}).physician || '', diagnosis: (ex.patient || {}).diagnosis || '', desc: ex.desc, immediate: ex.immediate, anonymous: ex.anonymous, harm: ex.harm || '', sentinel: !!ex.reporterSentinel, deviceTag: ex.deviceTag || '', medStage: (ex.med || {}).stage || '', drug: (ex.med || {}).drug || '', medType: (ex.med || {}).type || '', ncc: (ex.med || {}).ncc || '', files: []}
       : Object.assign({_for: 'new', step: 1, typeId: '', deptId: Q.me.deptId, title: '', location: '', occurredAt: '', affected: 'in', mrn: '', pname: '', age: '', sex: '', physician: '', diagnosis: '', desc: '', immediate: '', anonymous: false, harm: '', sentinel: false, deviceTag: '', files: []}, Q.prefill ? {} : (Q.pref.get(key, null) || {}), Q.prefill || {}, {_for: 'new', step: 1});
     Q.prefill = null;
     Q.form.files = Q.form.files || [];
@@ -293,6 +312,7 @@ Q.views.report = {render(parts) {
       ${Q.f.text('title', L('عنوان مختصر', 'Short title'), F.title, {req: true, w: true, ph: L('مثال: سقوط مريض أثناء التوجه لدورة المياه', 'e.g. Patient fall on the way to the bathroom'), attrs: 'maxlength="120"'})}
       ${Q.f.text('occurredAt', L('تاريخ ووقت الحدث', 'Date & time of occurrence'), F.occurredAt, {req: true, type: 'datetime-local', attrs: `max="${Q.toInput(Q.now())}"`})}
       ${Q.f.text('location', L('الموقع', 'Location'), F.location, {ph: L('الغرفة أو السرير', 'Room or bed')})}
+      ${(Q.db.get('types', F.typeId) || {}).id === 't-med' || (Q.db.get('types', F.typeId) || {}).cat === 'med' ? `<div class="w sub-block"><h4>${L('تفاصيل الخطأ الدوائي', 'Medication error details')}</h4><div class="fgrid">${Q.f.sel('medStage', L('مرحلة حدوث الخطأ', 'Stage'), Object.entries(Q.MED_STAGE).map(([k, v]) => [k, T(v)]), F.medStage || '', {req: true, empty: L('اختر', 'Select')})}${Q.f.text('drug', L('الدواء', 'Drug'), F.drug || '', {req: true, ltr: true})}${Q.f.sel('medType', L('نوع الخطأ', 'Error type'), Object.entries(Q.MED_TYPE).map(([k, v]) => [k, T(v)]), F.medType || '', {req: true, empty: L('اختر', 'Select')})}${Q.f.sel('ncc', L('فئة الضرر (NCC MERP)', 'Harm category (NCC MERP)'), Object.entries(Q.NCC).map(([k, v]) => [k, `${k}: ${T(v)}`]), F.ncc || '', {req: true, empty: L('اختر', 'Select')})}</div></div>` : ''}
       ${isDev ? Q.f.sel('deviceTag', L('الجهاز', 'Device'), Q.db.all('devices').map(d => [d.id, `${d.id}: ${T(d.name)}`]), F.deviceTag, {empty: L('اختر الجهاز إن وُجد', 'Select device if known'), w: true}) : ''}
       ${Q.f.radio('affected', L('المتأثر', 'Affected'), Object.entries(Q.AFFECTED).map(([k, v]) => [k, T(v)]), F.affected, {w: true})}
       ${['in', 'out'].includes(F.affected) ? `<fieldset class="w addr"><legend>${L('بطاقة المريض (Addressograph)', 'Patient addressograph')}</legend><div class="fgrid three">
@@ -351,6 +371,7 @@ function mountForm(root) {
     Q.render(); });
 }
 const validate = s => { const F = Q.form;
+  if (s === 1 && F.typeId === 't-med' && (!F.medStage || !String(F.drug || '').trim() || !F.medType || !F.ncc)) return L('للخطأ الدوائي: أكمل المرحلة والدواء ونوع الخطأ وفئة الضرر.', 'For a medication error, complete the stage, drug, error type and harm category.');
   if (s === 1) { if (!F.typeId || !F.deptId || !String(F.title).trim() || !F.occurredAt || String(F.desc).trim().length < 20 || !String(F.immediate || '').trim()) return L('أكمل الحقول الإلزامية (ومنها الإجراء الفوري المتخذ)، واكتب وصفًا لا يقل عن 20 حرفًا.', 'Complete the required fields (including the immediate action taken); the description needs at least 20 characters.');
     if (new Date(F.occurredAt) > Q.now()) return L('وقت الحدث لا يمكن أن يكون في المستقبل.', 'Occurrence time cannot be in the future.'); }
   if (s === 2 && !F.harm) return L('حدد مدى تأثير الحدث.', 'Select the impact.');
@@ -364,15 +385,15 @@ Q.act('rf-submit', () => {
   const patient = ['in', 'out'].includes(F.affected) ? {mrn: F.mrn, name: F.pname, age: F.age, sex: F.sex, physician: F.physician, diagnosis: F.diagnosis} : null;
   if (F._for !== 'new') {
     const x = Q.db.get('incidents', F._for);
-    Object.assign(x, {typeId: F.typeId, deptId: F.deptId, title: {ar: F.title, en: F.title}, location: F.location, occurredAt: Q.fromInput(F.occurredAt), affected: F.affected, patient, desc: F.desc, immediate: F.immediate, anonymous: !!F.anonymous, harm: F.harm, reporterSentinel: !!F.sentinel, deviceTag: F.deviceTag || null, attachments: (x.attachments || []).concat(F.files)});
+    Object.assign(x, {typeId: F.typeId, deptId: F.deptId, title: {ar: F.title, en: F.title}, location: F.location, occurredAt: Q.fromInput(F.occurredAt), affected: F.affected, patient, desc: F.desc, immediate: F.immediate, anonymous: !!F.anonymous, harm: F.harm, reporterSentinel: !!F.sentinel, deviceTag: F.deviceTag || null, med: F.ncc ? {stage: F.medStage, drug: F.drug, type: F.medType, ncc: F.ncc} : x.med || null, attachments: (x.attachments || []).concat(F.files)});
     if (x.clarify && x.clarify.open && x.reporterId === Q.me.id) { x.clarify.open = false; x.clarify.answeredAt = Q.iso(Q.now()); Q.audit('incident', x.id, 'clarified'); }
     Q.db.put('incidents', x); Q.audit('incident', x.id, 'updated'); Q.form = null; Q.go('#/incidents/' + x.id); Q.toast(L('حُفظت التعديلات', 'Changes saved')); return;
   }
   const yr = new Date().getFullYear();
-  const n = Q.db.all('incidents').filter(x => x.id.startsWith(`OVR-${yr}-`)).reduce((m, x) => Math.max(m, +x.id.slice(-4)), 0) + 1;
+  const n = Q.idObjs('incidents').filter(x => x.id.startsWith(`OVR-${yr}-`)).reduce((m, x) => Math.max(m, +x.id.slice(-4)), 0) + 1;
   const id = `OVR-${yr}-${String(n).padStart(4, '0')}`;
   const x = {id, typeId: F.typeId, deptId: F.deptId, title: {ar: F.title, en: F.title}, location: F.location, occurredAt: Q.fromInput(F.occurredAt), reportedAt: Q.iso(Q.now()), createdAt: Q.iso(Q.now()), reporterId: Q.me.id, anonymous: !!F.anonymous,
-    affected: F.affected, patient, desc: F.desc, immediate: F.immediate, harm: F.harm, reporterSentinel: !!F.sentinel, deviceTag: F.deviceTag || null, attachments: F.files, stage: 'new'};
+    affected: F.affected, patient, desc: F.desc, immediate: F.immediate, harm: F.harm, reporterSentinel: !!F.sentinel, deviceTag: F.deviceTag || null, med: F.ncc ? {stage: F.medStage, drug: F.drug, type: F.medType, ncc: F.ncc} : null, sourceRecord: F.sourceRecord || null, attachments: F.files, stage: 'new'};
   Q.db.put('incidents', x); Q.audit('incident', id, 'submitted');
   if (x.deviceTag) { const d = Q.db.get('devices', x.deviceTag); if (d && d.status === 'ok') { d.status = 'check'; Q.db.put('devices', d); } }
   Q.pref.del('draft:' + Q.me.id); Q.form = null;

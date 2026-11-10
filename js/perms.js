@@ -1,0 +1,55 @@
+/* صلاحيات الأدوار: مصدر واحد يقرؤه المتصفح والخادم معًا حتى لا تختلف الصلاحيات بينهما.
+   Role permissions: one source read by both the browser (core.js) and the server (server/access.mjs). */
+(function (root) {
+  'use strict';
+  root.QPERMS = {
+    'incident.all': ['qps', 'director', 'admin'],
+    'incident.review': ['qps', 'director'],
+    'incident.close': ['qps', 'director'],
+    'incident.supervise': ['supervisor', 'qps', 'director'],
+    'rca.view': ['qps', 'director', 'supervisor', 'biomed'],
+    'rca.edit': ['qps', 'director'],
+    'capa.view': ['qps', 'director', 'supervisor', 'biomed', 'admin'],
+    'capa.create': ['qps', 'director', 'supervisor'],
+    'capa.verify': ['qps', 'director'],
+    'kpi.view': ['qps', 'director', 'supervisor', 'admin'],
+    'kpi.enter': ['qps', 'director', 'supervisor'],
+    'kpi.define': ['qps', 'director'],
+    'cbahi.view': ['qps', 'director', 'supervisor', 'admin', 'biomed'],
+    'cbahi.edit': ['qps', 'director'],
+    'cbahi.upload': ['qps', 'director', 'supervisor', 'biomed'],
+    'device.view': ['biomed', 'admin', 'director', 'qps', 'supervisor'],
+    'device.edit': ['biomed', 'admin', 'director'],
+    'reports.view': ['qps', 'director', 'admin'],
+    'policy.view': ['reporter', 'supervisor', 'qps', 'director', 'biomed', 'admin'],
+    'policy.edit': ['qps', 'director', 'supervisor'],
+    'policy.approve': ['director', 'qps'],
+    'complaint.log': ['reporter', 'supervisor', 'qps', 'director', 'biomed', 'admin'],
+    'complaint.view': ['supervisor', 'qps', 'director', 'admin'],
+    'complaint.manage': ['qps', 'director'],
+    'round.view': ['supervisor', 'qps', 'director', 'admin', 'biomed'],
+    'round.conduct': ['supervisor', 'qps', 'director'],
+    'round.plan': ['qps', 'director'],
+    'risk.view': ['qps', 'director', 'supervisor', 'admin', 'biomed'],
+    'risk.edit': ['qps', 'director', 'supervisor'],
+    'survey.manage': ['qps', 'director'],
+    'survey.view': ['qps', 'director', 'supervisor', 'admin'],
+    'committee.view': ['qps', 'director', 'supervisor', 'admin', 'biomed'],
+    'committee.manage': ['qps', 'director'],
+    'ext.view': ['qps', 'director', 'admin', 'biomed'],
+    'ext.edit': ['qps', 'director', 'biomed'],
+    'drill.view': ['qps', 'director', 'supervisor', 'admin', 'biomed'],
+    'drill.edit': ['qps', 'director', 'admin', 'biomed'],
+    'log.view': ['reporter', 'supervisor', 'qps', 'director', 'biomed', 'admin'],
+    'project.view': ['qps', 'director', 'supervisor', 'admin'],
+    'project.edit': ['qps', 'director', 'supervisor'],
+    'plan.view': ['qps', 'director', 'admin', 'supervisor'],
+    'plan.manage': ['qps', 'director'],
+    'review.view': ['qps', 'director', 'admin'],
+    'review.decide': ['director', 'qps'],
+    'admin': ['admin', 'director'],
+    'dashboard': ['qps', 'director', 'admin', 'supervisor', 'biomed']
+  };
+  /* confidential log types (peer review, credentialing, occupational health): roles that may open them; staff always see their own entries */
+  root.QPRIVATE_LOGS = {oppe: ['qps', 'director', 'supervisor'], mm: ['qps', 'director', 'supervisor'], competency: ['qps', 'director', 'supervisor'], credential: ['qps', 'director', 'admin'], exposure: ['qps', 'director']};
+})(typeof window !== 'undefined' ? window : globalThis);

@@ -38,6 +38,8 @@ const HELPERS = `window.H = {
     H.set('[data-report] [name=occurredAt]', Q.toInput(Q.add(Q.now(), -2 * Q.HOUR)));
     if (o.affected) { H.set('[data-report] [name=affected][value=' + o.affected + ']', true); await H.sleep(80); }
     if (H.q('[data-report] [name=mrn]')) { H.set('[data-report] [name=mrn]', '884213'); H.set('[data-report] [name=age]', '3 days'); H.set('[data-report] [name=physician]', 'د. ناصر العتيبي'); H.set('[data-report] [name=diagnosis]', 'كسر في عنق الفخذ'); }
+    /* MED-01: a medication error needs stage, drug, error type and NCC MERP harm category */
+    if (H.q('[data-report] [name=ncc]')) { H.set('[data-report] [name=medStage]', o.medStage || 'administration'); H.set('[data-report] [name=drug]', o.drug || 'Gentamicin'); H.set('[data-report] [name=medType]', o.medType || 'dose'); H.set('[data-report] [name=ncc]', o.ncc || 'C'); }
     H.set('[data-report] [name=desc]', o.desc || 'وصف وقائعي للحدث كما تمت ملاحظته في القسم دون تحليل.');
     H.set('[data-report] [name=immediate]', 'إبلاغ الطبيب المناوب ومراقبة المريض.');
     await H.click('[data-act=rf-next]'); if (Q.form.step !== 2) throw new Error('step 1 blocked: ' + H.q('[data-err]').textContent);
@@ -56,7 +58,7 @@ const HELPERS = `window.H = {
   async newCapa(btnSel, owner, title) { const before = Q.db.all('capa').length; await H.click(btnSel); const err = await H.submitDlg({'[name=title]': title, '[name=ownerId]': owner});
     const c = Q.db.all('capa').length > before ? Q.db.all('capa')[Q.db.all('capa').length - 1] : null; return {err, id: c && c.id, status: c && c.status}; },
   async capaDone(id, uid) { await H.as(uid); await H.go('#/capa/' + id); if (!H.q('[data-act=capa-progress]')) return 'no progress button'; await H.click('[data-act=capa-progress]');
-    return (await H.submitDlg({'[name=done]': true, '[name=text]': 'نُفذ الإجراء ووُثّق.'})) || Q.db.get('capa', id).status; },
+    return (await H.submitDlg({'[name=done]': true, '[name=text]': 'نُفذ الإجراء ووُثّق.', '[name=evidence]': 'محضر التدريب وقائمة الحضور مرفقة.'})) || Q.db.get('capa', id).status; },
   async capaVerify(id, uid) { await H.as(uid); await H.go('#/capa/' + id); if (!H.q('[data-act=capa-verify]')) return 'no verify button'; await H.click('[data-act=capa-verify]');
     return (await H.submitDlg({'[name=note]': 'تدقيق 20 حالة بعد التطبيق دون ملاحظات.'})) || Q.db.get('capa', id).status; },
   async closeInc(id, uid) { await H.as(uid); await H.go('#/incidents/' + id); const f = H.q('form[data-form=close]'); if (!f) return 'no close form';
@@ -217,7 +219,7 @@ for (const [uid, role] of Object.entries(ROLES)) {
     await t.setFiles(`input[data-up="${tgt.el}"]`, [DIR.replace(/\//g, '\\') + '\\evidence.pdf']); await new Promise(r => setTimeout(r, 400));
     const up = await E(`const e = Q.db.get('standards','${tgt.std}').elements.find(e => e.id==='${tgt.el}'); return {st: e.status, files: e.files.length, qps: H.tasksOf('u2').some(t => t.kind==='cbahi' && t.ref==='${tgt.std}')}`);
     check(CB, 'Owner uploads evidence → "under review" + QPS review task', up.st === 'uploaded' && up.qps, up);
-    const ap = await E(`await H.as('u2'); await H.go('#/cbahi/' + encodeURIComponent('${tgt.std}')); await H.click('[data-act=el-approve][data-el="${tgt.el}"]'); return Q.readiness().ok`);
+    const ap = await E(`await H.as('u2'); await H.go('#/cbahi/' + encodeURIComponent('${tgt.std}')); await H.click('[data-act=el-approve][data-el="${tgt.el}"]'); await H.submitDlg(); return Q.readiness().ok`);
     check(CB, 'QPS approves → readiness count increases', ap === r0 + 1, {before: r0, after: ap});
   } }
 

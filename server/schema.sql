@@ -146,6 +146,152 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 CREATE INDEX IF NOT EXISTS ix_comments_ref ON comments(ref, at);
 
+CREATE TABLE IF NOT EXISTS policies (       -- policy & procedure register (document control)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  dept_id    TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  owner_id   TEXT GENERATED ALWAYS AS (json_extract(data, '$.ownerId')) VIRTUAL,
+  status     TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  version    INTEGER GENERATED ALWAYS AS (json_extract(data, '$.version')) VIRTUAL,
+  review_due TEXT GENERATED ALWAYS AS (json_extract(data, '$.reviewDue')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_pol_status ON policies(status, review_due);
+
+CREATE TABLE IF NOT EXISTS complaints (     -- patient complaints and responses
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  dept_id     TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  owner_id    TEXT GENERATED ALWAYS AS (json_extract(data, '$.ownerId')) VIRTUAL,
+  status      TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  category    TEXT GENERATED ALWAYS AS (json_extract(data, '$.category')) VIRTUAL,
+  received_at TEXT GENERATED ALWAYS AS (json_extract(data, '$.receivedAt')) VIRTUAL,
+  due         TEXT GENERATED ALWAYS AS (json_extract(data, '$.due')) VIRTUAL,
+  responded_at TEXT GENERATED ALWAYS AS (json_extract(data, '$.response.at')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_cmp_status ON complaints(status, due);
+
+CREATE TABLE IF NOT EXISTS checklists (     -- quality round checklist templates
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  name_en TEXT GENERATED ALWAYS AS (json_extract(data, '$.name.en')) VIRTUAL
+);
+
+CREATE TABLE IF NOT EXISTS rounds (         -- scheduled and completed quality rounds
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  dept_id      TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  checklist_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.checklistId')) VIRTUAL,
+  lead_id      TEXT GENERATED ALWAYS AS (json_extract(data, '$.leadId')) VIRTUAL,
+  status       TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  planned_at   TEXT GENERATED ALWAYS AS (json_extract(data, '$.plannedAt')) VIRTUAL,
+  score        REAL GENERATED ALWAYS AS (json_extract(data, '$.score')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_rounds_status ON rounds(status, planned_at);
+
+CREATE TABLE IF NOT EXISTS risks (       -- risk register (RSK-01/03)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_risks_ref ON risks(ref_id);
+
+CREATE TABLE IF NOT EXISTS fmeas (       -- proactive risk assessments (RSK-02)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_fmeas_ref ON fmeas(ref_id);
+
+CREATE TABLE IF NOT EXISTS surveys (     -- survey definitions (PSI-05, PEX-01)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_surveys_ref ON surveys(ref_id);
+
+CREATE TABLE IF NOT EXISTS responses (   -- survey responses (anonymous)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_responses_ref ON responses(ref_id);
+
+CREATE TABLE IF NOT EXISTS committees (  -- committees (GOV-01)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_committees_ref ON committees(ref_id);
+
+CREATE TABLE IF NOT EXISTS meetings (    -- committee meetings and decisions (GOV-01/02)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_meetings_ref ON meetings(ref_id);
+
+CREATE TABLE IF NOT EXISTS extreports (  -- external reporting log (GOV-05)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_extreports_ref ON extreports(ref_id);
+
+CREATE TABLE IF NOT EXISTS mocks (       -- mock surveys (AUD-05)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_mocks_ref ON mocks(ref_id);
+
+CREATE TABLE IF NOT EXISTS drills (      -- fire, evacuation and disaster exercises (FAC-05/09)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.kind')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  ref_id  TEXT GENERATED ALWAYS AS (json_extract(data, '$.refId')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_drills_ref ON drills(ref_id);
+
+CREATE TABLE IF NOT EXISTS records (     -- operational logs & registers (Phase 3 engine)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.type')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  at      TEXT GENERATED ALWAYS AS (json_extract(data, '$.at')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_records_kind ON records(kind, at);
+
+CREATE TABLE IF NOT EXISTS projects (    -- quality improvement projects (KPI-04 PDSA)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.type')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  at      TEXT GENERATED ALWAYS AS (json_extract(data, '$.at')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_projects_kind ON projects(kind, at);
+
+CREATE TABLE IF NOT EXISTS plans (       -- annual quality plans (KPI-05)
+  id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK (json_valid(data)), rev INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  kind    TEXT GENERATED ALWAYS AS (json_extract(data, '$.type')) VIRTUAL,
+  status  TEXT GENERATED ALWAYS AS (json_extract(data, '$.status')) VIRTUAL,
+  dept_id TEXT GENERATED ALWAYS AS (json_extract(data, '$.deptId')) VIRTUAL,
+  at      TEXT GENERATED ALWAYS AS (json_extract(data, '$.at')) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS ix_plans_kind ON plans(kind, at);
+
 CREATE TABLE IF NOT EXISTS files (          -- attachments and CBAHI evidence
   id         TEXT PRIMARY KEY,
   name       TEXT,

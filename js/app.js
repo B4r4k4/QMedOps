@@ -17,6 +17,15 @@ Q.parseHash = () => {
 };
 Q.go = h => { if (location.hash === h) Q.render(); else location.hash = h; };
 Q.home = () => Q.can('dashboard') ? '#/dashboard' : '#/tasks';
+/* can the current user open this link? (page permission, and for one record: it exists here and is visible) — links to anything else are rendered as plain text */
+Q.canRoute = h => { if (!h || !Q.me) return false; const [path] = String(h).replace(/^#\/?/, '').split('?'), [name, id, sub] = path.split('/').map(decodeURIComponent);
+  const v = Q.views[name]; if (!v) return false; if (v.perm && !Q.can(v.perm)) return false;
+  if (name === 'incidents' && id) { const x = Q.db.get('incidents', id); return !!x && Q.canSeeIncident(x); }
+  if (name === 'indicators' && id && id !== 'entry') { const k = Q.db.get('kpis', id); return !!k && Q.canSeeKPI(k); }
+  if (name === 'capa' && id) { const c = Q.db.get('capa', id); return !!c && Q.canSeeCAPA(c); }
+  if (name === 'logs' && id === 'rec' && sub) { const r = Q.db.get('records', sub); return !!r && (!Q.canViewLog || Q.canViewLog(Q.LOG_TYPES[r.type]) || r.staff === Q.me.id); }
+  if (name === 'logs' && id && id !== 'rec') return !Q.canViewLog || !Q.LOG_TYPES[id] || Q.canViewLog(Q.LOG_TYPES[id]);
+  return true; };
 
 const NAV = [
   {id: 'dashboard', icon: 'grid', t: ['مركز العمليات', 'Operations center'], perm: 'dashboard'},
@@ -25,10 +34,23 @@ const NAV = [
   {id: 'incidents', icon: 'report', t: ['بلاغات السلامة', 'Safety reports'], badge: () => Q.visibleIncidents().filter(x => x.stage !== 'closed').map(x => x.id)},
   {id: 'rca', icon: 'search', t: ['التحقيق و RCA', 'Investigations & RCA'], perm: 'rca.view'},
   {id: 'capa', icon: 'check-square', t: ['الإجراءات التصحيحية', 'Corrective actions'], perm: 'capa.view', badge: () => Q.db.all('capa').filter(c => ['open', 'progress'].includes(c.status) && new Date(c.due) < Q.now() && Q.canSeeCAPA(c)).map(c => c.id), warn: true},
+  {sep: ['مهام قسم الجودة', 'Quality department']},
+  {id: 'policies', icon: 'book', t: ['السياسات والإجراءات', 'Policies & procedures'], perm: 'policy.view', badge: () => Q.policyAlerts ? Q.policyAlerts() : [], warn: true},
+  {id: 'complaints', icon: 'message', t: ['شكاوى المرضى', 'Patient complaints'], perm: 'complaint.log', badge: () => Q.visibleComplaints ? Q.visibleComplaints().filter(c => !['responded', 'closed'].includes(c.status)).map(c => c.id) : []},
+  {id: 'risks', icon: 'alert', t: ['المخاطر و FMEA', 'Risks & FMEA'], perm: 'risk.view', badge: () => Q.riskNeedsPlan ? Q.db.all('risks').filter(Q.riskNeedsPlan).map(r => r.id) : [], warn: true},
+  {id: 'committees', icon: 'users', t: ['اللجان والقرارات', 'Committees & decisions'], perm: 'committee.view'},
+  {id: 'surveys', icon: 'message', t: ['الاستبيانات', 'Surveys'], perm: 'survey.view'},
+  {id: 'logs', icon: 'file', t: ['السجلات والنماذج', 'Logs & registers'], perm: 'log.view', badge: () => Q.LOG_TYPES ? Object.values(Q.LOG_TYPES).filter(c => Q.canViewLog(c)).flatMap(c => Q.recsOf(c.id).filter(Q.recOpen).map(r => r.id)) : [], warn: true},
+  {id: 'rounds', icon: 'clipboard', t: ['جولات الجودة', 'Quality rounds'], perm: 'round.view', badge: () => Q.db.all('rounds').filter(r => r.status === 'planned' && new Date(r.plannedAt) < Q.now()).map(r => r.id), warn: true},
   {sep: ['الأداء والامتثال', 'Performance & compliance']},
   {id: 'indicators', icon: 'pulse', t: ['المؤشرات', 'Indicators'], perm: 'kpi.view'},
   {id: 'cbahi', icon: 'shield', t: ['جاهزية CBAHI', 'CBAHI readiness'], perm: 'cbahi.view'},
   {id: 'devices', icon: 'device', t: ['الأجهزة الطبية', 'Medical devices'], perm: 'device.view'},
+  {id: 'drills', icon: 'clock', t: ['التمارين والطوارئ', 'Drills & emergencies'], perm: 'drill.view'},
+  {id: 'external', icon: 'send', t: ['الإبلاغ الخارجي', 'External reporting'], perm: 'ext.view', badge: () => Q.extRows ? Q.extRows().filter(r => Q.extState(r) === 'overdue').map(r => r.key) : [], warn: true},
+  {id: 'projects', icon: 'pulse', t: ['مشاريع التحسين PDSA', 'Improvement projects'], perm: 'project.view'},
+  {id: 'plan', icon: 'calendar', t: ['خطة الجودة السنوية', 'Annual quality plan'], perm: 'plan.view'},
+  {id: 'review', icon: 'print', t: ['مراجعة الإدارة', 'Management review'], perm: 'review.view'},
   {id: 'reports', icon: 'chart', t: ['التقارير', 'Reports'], perm: 'reports.view'},
   {sep: ['النظام', 'System'], perm: 'admin'},
   {id: 'admin', icon: 'settings', t: ['الإعدادات والمستخدمون', 'Settings & users'], perm: 'admin'}
@@ -82,6 +104,8 @@ Q.render = () => {
   document.documentElement.lang = Q.lang; document.documentElement.dir = Q.lang === 'ar' ? 'rtl' : 'ltr';
   $('.skip').textContent = L('تخطي إلى المحتوى', 'Skip to content');
   Q.closePop();
+  const pr = Q.parseHash();
+  if (pr.name === 's' && Q.publicSurvey) { $('#app').hidden = true; $('#login').hidden = false; $('#login').innerHTML = Q.publicSurvey(pr.parts, pr.query); Q.mountPublic($('#login')); document.title = L('سلامة | استبيان', 'Salamah | Survey'); return; }
   if (!Q.me) { $('#app').hidden = true; $('#login').hidden = false; renderLogin(); document.title = L('سلامة | تسجيل الدخول', 'Salamah | Sign in'); return; }
   $('#app').hidden = false; $('#login').hidden = true;
   const r = Q.parseHash();
@@ -95,7 +119,7 @@ Q.render = () => {
   const root = $('#views');
   const path = r.parts.join('/'), fresh = Q._lastPath !== path; Q._lastPath = path;
   root.innerHTML = `<section class="view ${out.cls || ''}${fresh ? ' enter' : ''}">${out.html}</section>`;
-  document.title = `${L('سلامة', 'Salamah')} | ${out.title.replace(/<[^>]+>/g, '')}`;
+  document.title = `${L('سلامة', 'Salamah')} | ${out.title.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')}`;
   out.mount && out.mount(root);
 };
 
@@ -221,14 +245,22 @@ function renderLogin() {
     </main>
     <footer class="landing-footer"><div class="landing-brand"><span class="logo-tile"><svg aria-hidden="true"><use href="#logo-mark"/></svg></span><span><b>${L('سلامة', 'Salamah')}</b><small>Q-MedOps</small></span></div><p>${L('منصة تشغيل الجودة وسلامة المرضى.', 'Quality and patient-safety operations platform.')}</p><a href="#landing-top">${L('العودة للأعلى', 'Back to top')} ↑</a></footer>
   </div>`;
-  $('[data-login]').addEventListener('submit', e => {
+  $('[data-login]').addEventListener('submit', async e => {
     e.preventDefault(); const d = Q.formData(e.target);
+    if (Q.API) { const r = await Q.serverLogin({email: String(d.email).trim(), password: String(d.password || '')}); if (!r.ok) $('[data-err]').textContent = r.status === 429 ? L('محاولات كثيرة؛ انتظر عشر دقائق.', 'Too many attempts; wait ten minutes.') : L('البريد أو كلمة المرور غير صحيحة.', 'Incorrect email or password.'); return; }
     const u = active.find(x => x.email.toLowerCase() === String(d.email).trim().toLowerCase());
     if (!u || !Q.checkPassword(u, String(d.password || ''))) { $('[data-err]').textContent = L('البريد أو كلمة المرور غير صحيحة.', 'Incorrect email or password.'); return; }
     Q.login(u.id); location.hash = Q.home(); Q.render();
   });
 }
-Q.act('demo-login', el => { const u = Q.user(el.dataset.id); if (!u || u.pwHash || u.active === false) return; Q.login(u.id); location.hash = Q.home(); Q.render(); Q.toast(L(`مرحبًا ${T(Q.me.name)}`, `Welcome, ${T(Q.me.name)}`)); });
+/* server sign-in: token first, then the data is loaded with it */
+Q.serverLogin = async body => { const r = await fetch('api/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); if (!r.ok) return {ok: false, status: r.status};
+  const j = await r.json(); Q.pref.set('token', j.token); Q._lost = false; Q._sessionUser = j.userId;
+  /* another user was loaded: start clean so nobody keeps the previous user's records in memory */
+  if (Q.db.remote) { Q.pref.set('session', j.userId); location.hash = '#/'; location.reload(); return {ok: true}; }
+  await Q.db.init(); Q.login(j.userId); location.hash = Q.home(); Q.render(); Q.toast(L(`مرحبًا ${T(Q.me.name)}`, `Welcome, ${T(Q.me.name)}`)); return {ok: true}; };
+Q.act('demo-login', async el => { if (Q.API) { const r = await Q.serverLogin({userId: el.dataset.id, demo: true}); if (!r.ok) Q.toast(L('تعذّر الدخول بهذا الحساب.', 'Could not sign in with this account.'), 'err'); return; }
+  const u = Q.user(el.dataset.id); if (!u || u.pwHash || u.active === false) return; Q.login(u.id); location.hash = Q.home(); Q.render(); Q.toast(L(`مرحبًا ${T(Q.me.name)}`, `Welcome, ${T(Q.me.name)}`)); });
 
 /* ---------- popovers ---------- */
 Q.openPop = (anchor, html) => {
@@ -255,11 +287,13 @@ Q.act('user-menu', el => {
     <button data-act="switch-user">${ic('users', 'sm')}${L('تبديل الحساب (تجربة)', 'Switch account (pilot)')}</button>
     <button data-act="logout">${ic('logout', 'sm')}${L('تسجيل الخروج', 'Sign out')}</button></div>`);
 });
-Q.act('logout', () => { Q.logout(); Q.render(); });
+/* sign-out ends the server session and clears every record from memory */
+Q.act('logout', async () => { if (Q.API) { try { await fetch('api/logout', {method: 'POST', headers: Q.auth({})}); } catch (e) {} Q.pref.del('token'); Q.logout(); location.hash = '#/'; location.reload(); return; } Q.logout(); Q.render(); });
 Q.act('switch-user', () => {
   Q.modal({title: L('تبديل الحساب', 'Switch account'), sub: L('للتجربة فقط: جرّب سير العمل بصلاحيات مختلفة', 'Pilot only: try the workflow with different roles'),
     body: `<div class="fgrid one">${Q.f.sel('u', L('الحساب', 'Account'), Q.userOpts(u => !u.pwHash || u.id === Q.me.id), Q.me.id)}</div>`, submit: L('تبديل', 'Switch'),
-    onSubmit: d => { Q.login(d.u); location.hash = Q.home(); Q.render(); Q.toast(L(`تم الدخول باسم ${T(Q.me.name)}`, `Signed in as ${T(Q.me.name)}`)); }});
+    onSubmit: async d => { if (Q.API && d.u !== Q.me.id) { const r = await fetch('api/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: d.u, demo: true})}); if (!r.ok) throw new Error(L('هذا الحساب يتطلب كلمة مرور.', 'This account needs its password.')); Q.pref.set('token', (await r.json()).token); Q.pref.set('session', d.u); location.hash = '#/'; location.reload(); return; }
+      Q.login(d.u); location.hash = Q.home(); Q.render(); Q.toast(L(`تم الدخول باسم ${T(Q.me.name)}`, `Signed in as ${T(Q.me.name)}`)); }});
 });
 Q.act('lang', () => { Q.lang = Q.lang === 'ar' ? 'en' : 'ar'; Q.pref.set('lang', Q.lang); Q.render(); });
 const TASK_ICON = {incident: 'report', capa: 'check-square', device: 'wrench', kpi: 'pulse', cbahi: 'shield'};
@@ -355,7 +389,7 @@ Q.views.dashboard = {perm: 'dashboard', render() {
   <div class="stats">
     ${Q.stat(L('بلاغات مفتوحة', 'Open reports') + scope, open.length, `<b class="good">${open.filter(x => x.stage === 'review').length}</b> ${L('بانتظار مراجعة الجودة', 'awaiting QPS review')} · <b>${open.filter(x => x.stage === 'new').length}</b> ${L('بانتظار المشرف', 'with supervisor')}`, {icon: 'report', go: '#/incidents'})}
     ${Q.stat(L('إجراءات تصحيحية متأخرة', 'Overdue CAPA'), late.length, late.length ? L(`أقدمها متأخر ${Q.nDays(oldest)}`, `oldest ${oldest} days late`) : L('لا يوجد تأخير', 'None overdue'), {icon: 'clock', go: '#/capa?tab=late', cls: late.length ? 'up-bad' : ''})}
-    ${Q.stat(L('جاهزية CBAHI', 'CBAHI readiness'), `${ready.pct}<small>%</small>`, Q.track([[ready.ok / ready.total * 100, 'var(--brand)'], [ready.med / ready.total * 100, 'var(--amber-bar)'], [ready.crit / ready.total * 100, 'var(--red)']]), {icon: 'shield', go: '#/cbahi'})}
+    ${(() => { const ri = Q.readinessIndex(); return Q.stat(L('جاهزية CBAHI للنظام', 'CBAHI system readiness'), `<span class="c-${ri.level}">${ri.score}</span><small>%</small>`, `<span class="chip ${ri.level}">${T(ri.verdict)}</span> ${L(`الأدلة ${ready.pct}%`, `evidence ${ready.pct}%`)}${ri.blockers.length ? ` · <b class="c-crit">${L(`${ri.blockers.length} موانع`, `${ri.blockers.length} blockers`)}</b>` : ''}`, {icon: 'shield', go: '#/cbahi'}); })()}
     ${Q.stat(L('وسيط مدة الإغلاق (90 يومًا)', 'Median time to close (90 d)'), m1 != null ? `${m1}<small>${L('يومًا', 'days')}</small>` : '—', m1 != null && m0 != null ? `<b class="${m1 <= m0 ? 'down-good' : 'up-bad'}">${m1 <= m0 ? '↓' : '↑'} ${Math.abs(m0 - m1)}</b> ${L('مقارنة بالفترة السابقة', 'vs previous period')}` : '', {icon: 'calendar'})}
   </div>
   <div class="dash">
@@ -393,8 +427,10 @@ Q.views.dashboard = {perm: 'dashboard', render() {
 Q.act('range', el => { Q.ui.range = +el.dataset.v; Q.saveUI(); Q.render(); });
 
 /* ---------- my tasks ---------- */
+const KIND = {incident: ['بلاغات السلامة', 'Safety reports'], capa: ['الإجراءات التصحيحية', 'Corrective actions'], log: ['السجلات', 'Logs'], policy: ['الوثائق', 'Documents'], complaint: ['الشكاوى', 'Complaints'], round: ['الجولات', 'Rounds'], cbahi: ['CBAHI', 'CBAHI'], kpi: ['المؤشرات', 'Indicators'], device: ['الأجهزة', 'Devices'], risk: ['المخاطر', 'Risks'], committee: ['اللجان', 'Committees'], survey: ['الاستبيانات', 'Surveys'], ext: ['الإبلاغ الخارجي', 'External reporting'], drill: ['التمارين', 'Drills'], project: ['مشاريع التحسين', 'Projects']};
+Q.act('task-kind', el => { Q.ui.taskKind = el.dataset.v; Q.saveUI(); Q.render(); });
 Q.views.tasks = {render() {
-  const ts = Q.tasks(), now = Q.now();
+  const all = Q.tasks(), now = Q.now(), kinds = [...new Set(all.map(t => t.kind))], kf = kinds.includes(Q.ui.taskKind) ? Q.ui.taskKind : 'all', ts = all.filter(t => kf === 'all' || t.kind === kf);
   const groups = [
     [L('متأخرة', 'Overdue'), ts.filter(t => t.due && new Date(t.due) < now)],
     [L('خلال 7 أيام', 'Next 7 days'), ts.filter(t => t.due && new Date(t.due) >= now && new Date(t.due) < Q.add(now, 7 * Q.DAY))],
@@ -408,6 +444,7 @@ Q.views.tasks = {render() {
   ${drafts ? `<div class="banner ok"><div class="ico">${ic('file')}</div><div><b>${L('لديك مسودة بلاغ غير مرسلة', 'You have an unsent draft report')}</b><p>${L('حُفظت', 'Saved')} ${Q.ago(drafts.savedAt)}</p></div><div class="act"><a class="btn btn-s sm" href="#/report/new">${L('متابعة المسودة', 'Continue draft')}</a></div></div>` : ''}
   <div class="dash">
     <section class="card">
+      ${kinds.length > 1 ? `<div class="toolbar wrap">${Q.seg([['all', L('الكل', 'All'), all.length], ...kinds.map(k => [k, T(KIND[k] || [k, k]), all.filter(t => t.kind === k).length])], kf, 'task-kind')}</div>` : ''}
       ${ts.length ? groups.filter(g => g[1].length).map(([h, list]) => `<div class="task-group"><h4>${h} <em>${list.length}</em></h4><ul class="tasks">${list.map(t => { const r = t.due ? Q.rel(t.due) : null; return `<li><a href="${t.link}"><span class="ti ${r && r.late ? 'crit' : ''}">${ic(TASK_ICON[t.kind], 'sm')}</span><div><b>${T(t.what)}</b><small><span class="ltr">${esc(t.ref)}</span> · ${esc(t.sub || '')}</small></div><span class="due ${r ? r.cls : ''}">${r ? r.txt : ''}</span>${ic('chev', 'sm flip')}</a></li>`; }).join('')}</ul></div>`).join('') : Q.empty(L('أحسنت، لا توجد مهام معلقة.', 'All clear: no pending tasks.'), 'check')}
     </section>
     <section class="card flush">
@@ -451,10 +488,25 @@ document.addEventListener('submit', e => {
 });
 window.addEventListener('hashchange', () => { Q.render(); window.scrollTo(0, 0); });
 
+/* ---------- server session ---------- */
+Q.sessionOk = async () => { const t = Q.pref.get('token', null); if (!t) return false;
+  try { const r = await fetch('api/session', {headers: Q.auth({}), cache: 'no-store'}); if (!r.ok) { Q.pref.del('token'); return false; } Q._sessionUser = (await r.json()).userId; return true; } catch (e) { return false; } };
+Q.loginBoot = async () => {
+  let acc = await (await fetch('api/public/accounts', {cache: 'no-store'})).json();
+  if (acc.empty) { const fresh = {}; Q.seed(fresh); fresh.meta = {version: 1, bilingual: 1, seededAt: Q.iso(Q.now())};
+    await fetch('api/import', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign(Q.db.pack(fresh), {meta: fresh.meta}))});
+    acc = await (await fetch('api/public/accounts', {cache: 'no-store'})).json(); }
+  Q.db.data = {users: acc.users || [], depts: acc.depts || [], settings: Object.assign(Q.defaultSettings(), acc.settings || {})};
+  Q.me = null; Q.render(); };
+
 /* ---------- boot ---------- */
 Q.boot = async () => {
+  /* public survey link: never load the platform database into a patient's browser */
+  if (Q.parseHash().name === 's' && Q.publicBoot && await Q.publicBoot()) return;
+  /* with the server: no valid session → the sign-in page, loaded with only the demo account list (nothing else leaves the server) */
+  if (Q.API && !(await Q.sessionOk())) { await Q.loginBoot(); return; }
   await Q.db.init();
-  const sid = Q.pref.get('session', null);
+  const sid = Q.API ? Q._sessionUser : Q.pref.get('session', null);
   if (sid && Q.user(sid) && Q.user(sid).active !== false) Q.me = Q.user(sid);
   Q.render();
   setInterval(Q.refresh, 5 * 60 * 1000);

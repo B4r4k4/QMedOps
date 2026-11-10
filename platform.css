@@ -472,3 +472,116 @@ tr.click td{transition:background-color .15s var(--ease)}
 @media (max-width:760px){
   .landing-nav{height:66px;padding-inline:16px}.landing-nav-actions .lang{padding:7px}.landing-nav-actions>.btn{display:none}.landing-hero{padding:42px 18px 58px;gap:38px}.hero-copy h1{font-size:36px}.hero-copy>p{font-size:15px}.hero-actions{align-items:stretch;flex-direction:column}.hero-actions .btn{justify-content:center}.hero-points{display:grid}.hero-visual{min-height:390px}.hero-visual>img{height:390px}.hero-visual::before{inset:16px -10px -16px 24px}.signal-a{inset-inline-end:-3px;top:20px}.signal-b{display:none}.landing-band{align-items:flex-start;flex-direction:column}.landing-band>div{justify-content:flex-start}.landing-band i{display:none}.landing-section{padding:76px 18px}.cap-grid{grid-template-columns:1fr}.cap-main{grid-column:auto;min-height:410px}.landing-flow{grid-template-columns:1fr;gap:18px}.landing-flow::before,.landing-flow::after{display:none}.landing-flow li{display:grid;grid-template-columns:28px 48px 1fr;gap:10px;align-items:start;padding:0}.flow-num{margin-top:15px}.landing-flow b{margin-top:5px}.product-section{gap:40px}.product-window{min-width:660px;transform:scale(.68);transform-origin:top right;margin-bottom:-130px}[dir=ltr] .product-window{transform-origin:top left}.trust-section{grid-template-columns:1fr;gap:35px}.landing-access{margin:8px 14px 70px;padding:32px 18px;border-radius:12px}.access-panel{grid-template-columns:1fr}.landing-footer{align-items:flex-start;flex-wrap:wrap}.landing-footer p{order:3;width:100%;margin:0}.landing-footer>a{margin-inline-start:auto}
 }
+
+/* ---------- quality department: readiness index, rounds, findings ---------- */
+.ri .card-h{align-items:center}
+.ri-score{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ri-score strong{font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+.ri-score strong small{font-size:16px;font-weight:600;margin-inline-start:1px}
+.ri.crit{border-color:var(--red-100)}
+.ri-block{margin:6px 0 0;padding-inline-start:18px;display:grid;gap:4px}
+.ri-block a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.ri-dims{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.ri-dims > a{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 14px;border:1px solid var(--line-2);border-radius:var(--r-sm);color:inherit;text-decoration:none;background:var(--sunken)}
+.ri-dims > a:hover{border-color:var(--brand-100)}
+.ri-dims span{font-size:12.5px;color:var(--ink-2)}
+.ri-dims b{font-size:17px;font-variant-numeric:tabular-nums}
+.ri-dims .track{grid-column:1/-1;height:4px;margin:0}
+.ri-dims small{grid-column:1/-1;font-size:11.5px;color:var(--muted)}
+
+.findings{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.findings > li{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line-2);border-radius:var(--r-sm);border-inline-start:3px solid var(--amber-bar)}
+.findings > li.crit{border-inline-start-color:var(--red)}
+.findings > li p{margin:2px 0 0;font-size:12.5px}
+.findings > li > :last-child{flex-shrink:0;display:flex;gap:6px;align-items:center}
+
+.cl-items{list-style:none;margin:0;padding:0;counter-reset:cl}
+.cl-items > li{counter-increment:cl;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:10px 16px;align-items:center;padding:12px 18px;border-top:1px solid var(--line-2)}
+.cl-items > li.no{background:var(--red-50)}
+.cl-q{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.cl-q::before{content:counter(cl);flex-shrink:0;min-width:22px;height:22px;border-radius:50%;background:var(--line-2);color:var(--ink-2);font-size:11.5px;font-weight:600;display:inline-grid;place-items:center}
+.cl-q .chip{flex-shrink:0}
+.cl-a{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cl-a .field{flex:1 1 160px;min-width:0;height:34px}
+.cl-opt{position:relative;cursor:pointer}
+.cl-opt input{position:absolute;opacity:0;pointer-events:none}
+.cl-opt span{display:inline-block;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:12.5px;background:var(--surface)}
+.cl-opt input:focus-visible + span{outline:2px solid var(--brand);outline-offset:1px}
+.cl-opt.yes input:checked + span{background:var(--brand-50);border-color:var(--brand);color:var(--brand-600);font-weight:600}
+.cl-opt.no input:checked + span{background:var(--red-50);border-color:var(--red);color:var(--red);font-weight:600}
+.cl-opt.na input:checked + span{background:var(--line-2);border-color:var(--faint);font-weight:600}
+.cl-mini{margin:8px 0 0;padding-inline-start:18px;font-size:12.5px;color:var(--ink-2);display:grid;gap:2px}
+@media (max-width:720px){
+  .cl-items > li{grid-template-columns:1fr;padding:12px 14px}
+  .ri .card-h{flex-wrap:wrap}
+  .findings > li{flex-direction:column}
+}
+
+/* ---------- Phase 1: approval chain, superseded files, evidence photo, audit programme ---------- */
+.sign-chain{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.sign-chain > li{display:flex;gap:10px;align-items:flex-start}
+.sign-chain .dot{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:inline-grid;place-items:center;color:#fff;margin-top:1px}
+.sign-chain li.done .dot{background:var(--brand);border-color:var(--brand)}
+.sign-chain li.cur .dot{border-color:var(--amber-bar);box-shadow:0 0 0 3px var(--amber-50)}
+.sign-chain p{margin:2px 0 0}
+.files li.superseded{opacity:.6}
+.files li .chip{margin-inline-start:6px}
+.cl-photo{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:1px dashed var(--line);border-radius:var(--r-sm);font-size:12px;color:var(--muted);cursor:pointer;max-width:150px}
+.cl-photo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-photo:hover{border-color:var(--brand);color:var(--brand)}
+.prog-grid th,.prog-grid td{text-align:center;padding:8px 6px;font-size:12px}
+.prog-grid th:first-child,.prog-grid td:first-child{text-align:start;position:sticky;inset-inline-start:0;background:var(--surface);z-index:1}
+.prog-grid td .chip{display:inline-block;margin:1px;font-size:11px;padding:2px 6px;text-decoration:none}
+.prog-grid tr.gap td:first-child{color:var(--red);font-weight:600}
+
+/* ---------- Phase 2: risks, FMEA, surveys (incl. public page), sample audits ---------- */
+.risk-top{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:16px;margin-bottom:16px;align-items:start}
+.risk-top .stats{margin:0}
+.stats.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.heat{display:grid;grid-template-columns:24px repeat(5,1fr);gap:4px}
+.heat .hd{font-size:11px;color:var(--muted);display:grid;place-items:center}
+.heat .c{aspect-ratio:1;border-radius:6px;display:grid;place-items:center;font-weight:700;font-size:14px}
+.heat .c.ok{background:var(--brand-50);color:var(--brand-600)}.heat .c.med{background:var(--amber-50);color:var(--amber)}
+.heat .c.high{background:var(--orange-50);color:var(--orange)}.heat .c.crit{background:var(--red-50);color:var(--red)}
+.risk-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.risk-scores > div{display:grid;gap:4px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-sm)}
+.risk-scores small{color:var(--muted)}
+.fmea td{vertical-align:top}
+.share .qr{flex-shrink:0;width:112px;min-height:40px}
+.share .qr img,.share .qr canvas{display:block}
+.crit-cell{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;border:1px solid var(--line-2);border-radius:var(--r-sm)}
+.crit-cell span{font-size:12.5px}.crit-cell .track{grid-column:1/-1;height:4px;margin:0}.crit-cell small{grid-column:1/-1;color:var(--muted);font-size:11px}
+.sample-grid th,.sample-grid td{text-align:center;padding:6px;font-size:12.5px}
+.sample-grid td:nth-child(2){text-align:start}
+.sm-cell{width:58px;height:32px;padding:0 4px;text-align:center}
+.sm-cell.yes{background:var(--brand-50);border-color:var(--brand)}.sm-cell.no{background:var(--red-50);border-color:var(--red)}
+.cl-legend{margin:0;padding-inline-start:20px;font-size:12.5px;color:var(--ink-2);columns:2;gap:24px}
+.sub-block{border:1px dashed var(--line);border-radius:var(--r-sm);padding:12px 14px;margin:4px 0}
+.sub-block h4{margin:0 0 8px;font-size:13px}
+/* public survey page (no sign-in) */
+.pub{min-height:100vh;background:var(--bg)}
+.pub-h{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.pub-h .logo-tile svg{width:30px;height:30px}.pub-h div{flex:1;display:grid}.pub-h small{color:var(--muted)}
+.pub-b{max-width:760px;margin:0 auto;padding:24px 16px 60px}
+.pub-b h1{font-size:22px;margin:0 0 6px}
+.pub-q{list-style:none;counter-reset:q;padding:0;margin:20px 0;display:grid;gap:14px}
+.pub-q > li{counter-increment:q;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.pub-q > li > p{margin:0 0 10px;font-weight:600}.pub-q > li > p::before{content:counter(q) ". ";color:var(--brand)}
+.pub-o{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pub-o label{cursor:pointer}.pub-o input{position:absolute;opacity:0;pointer-events:none}
+.pub-o span{display:grid;place-items:center;gap:2px;padding:10px 4px;border:1px solid var(--line);border-radius:var(--r-sm);font-weight:700;text-align:center}
+.pub-o small{font-weight:400;font-size:11px;color:var(--muted);line-height:1.2}
+.pub-o input:checked + span{background:var(--brand-50);border-color:var(--brand);color:var(--brand-600)}
+.pub-o input:focus-visible + span{outline:2px solid var(--brand)}
+@media (max-width:720px){.risk-top{grid-template-columns:1fr}.risk-scores{grid-template-columns:1fr}.pub-o small{display:none}.cl-legend{columns:1}}
+
+/* ---------- Phase 3: logs & registers, management review ---------- */
+.grp-h{font-size:14px;margin:22px 0 10px;color:var(--ink-2)}
+.log-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.log-card{display:grid;gap:6px;padding:14px 16px;color:inherit;text-decoration:none}
+.log-card:hover{border-color:var(--brand-100)}
+.log-card h4{margin:0;font-size:14px}
+.log-card .lm{display:flex;align-items:baseline;gap:8px}.log-card .lm b{font-size:20px}.log-card .lm small{color:var(--muted);font-size:11.5px}
+.print-only{display:none}
+@media print{.side,.top,.no-print,.btn,.ibtn{display:none!important}.print-only{display:block}.print-page{border:0;box-shadow:none}}
+.toolbar.wrap{flex-wrap:wrap}.toolbar.wrap .seg{flex-wrap:wrap;max-width:100%}
