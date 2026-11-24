@@ -521,7 +521,10 @@ Q.loginBoot = async () => {
   Q.me = null; Q.render(); };
 
 /* ---------- boot ---------- */
+/* a static host (Netlify, GitHub Pages…) has no api/ server: probe it once and fall back to the in-browser demo */
+Q.serverUp = async () => { try { const r = await fetch('api/public/accounts', {cache: 'no-store'}); return r.ok && /json/i.test(r.headers.get('content-type') || ''); } catch (e) { return false; } };
 Q.boot = async () => {
+  if (Q.API && !(await Q.serverUp())) Q.API = null;
   /* public survey link: never load the platform database into a patient's browser */
   if (Q.parseHash().name === 's' && Q.publicBoot && await Q.publicBoot()) return;
   /* with the server: no valid session → the sign-in page, loaded with only the demo account list (nothing else leaves the server) */

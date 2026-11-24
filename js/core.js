@@ -95,7 +95,7 @@ const newMeta = () => ({version: 1, bilingual: 1, seededAt: Q.iso(Q.now())});
 Q.db = {
   data: {}, persistent: false, remote: false, rev: 0, epoch: 0, prefs: {}, queue: Promise.resolve(), inflight: {}, acked: {},
   async init() {
-    if (API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store', headers: Q.auth({})}); if (r.status === 401) { Q.authLost(); return; } if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.ensureAccounts(); this.ensureQuality(); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
+    if (Q.API) { try { const r = await fetch(`${API}/data`, {cache: 'no-store', headers: Q.auth({})}); if (r.status === 401) { Q.authLost(); return; } if (r.ok) { this.remote = this.persistent = true; await this.load(await r.json()); this.ensureAccounts(); this.ensureQuality(); this.sync(); return; } } catch (e) { /* no server: fall back to the browser */ } }
     try { idb = await openIDB(); this.persistent = true; } catch (e) { idb = null; }
     let meta = null;
     if (idb) { try { meta = await kvGet('meta'); } catch (e) { meta = null; } }
