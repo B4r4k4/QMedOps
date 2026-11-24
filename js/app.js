@@ -106,7 +106,7 @@ Q.render = () => {
   Q.closePop();
   const pr = Q.parseHash();
   if (pr.name === 's' && Q.publicSurvey) { $('#app').hidden = true; $('#login').hidden = false; $('#login').innerHTML = Q.publicSurvey(pr.parts, pr.query); Q.mountPublic($('#login')); document.title = L('سلامة | استبيان', 'Salamah | Survey'); return; }
-  if (!Q.me) { $('#app').hidden = true; $('#login').hidden = false; if (pr.name === 'login') renderSignIn(); else renderLogin(); document.title = pr.name === 'login' ? L('سلامة | تسجيل الدخول', 'Salamah | Sign in') : L('سلامة | منصة الجودة وسلامة المرضى', 'Salamah | Quality & patient safety'); return; }
+  if (!Q.me) { $('#app').hidden = true; $('#login').hidden = false; if (pr.name === 'login') renderSignIn(); else { renderLogin(); bentoType(); } document.title = pr.name === 'login' ? L('سلامة | تسجيل الدخول', 'Salamah | Sign in') : L('سلامة | منصة الجودة وسلامة المرضى', 'Salamah | Quality & patient safety'); return; }
   $('#app').hidden = false; $('#login').hidden = true;
   const r = Q.parseHash();
   if (!r.name || r.name === 'login') { location.replace(Q.home()); return; }
@@ -122,6 +122,25 @@ Q.render = () => {
   document.title = `${L('سلامة', 'Salamah')} | ${out.title.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')}`;
   out.mount && out.mount(root);
 };
+
+/* bento hero: typewriter search placeholder (stops when the landing is left) */
+let typeTimer = null;
+function bentoType() {
+  clearTimeout(typeTimer);
+  const el = document.querySelector('.bt-type'); if (!el) return;
+  const words = JSON.parse(el.dataset.words), still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) { el.textContent = words[0]; return; }
+  let w = 0, c = 0, del = false;
+  const tick = () => {
+    if (!el.isConnected) return;
+    const word = words[w]; c += del ? -1 : 1; el.textContent = word.slice(0, c);
+    let wait = del ? 28 : 65;
+    if (!del && c === word.length) { del = true; wait = 1600; }
+    else if (del && c === 0) { del = false; w = (w + 1) % words.length; wait = 350; }
+    typeTimer = setTimeout(tick, wait);
+  };
+  tick();
+}
 
 /* ---------- login ---------- */
 function renderLogin() {
@@ -153,27 +172,52 @@ function renderLogin() {
     </header>
 
     <main id="landing-top">
-      <section class="landing-hero">
-        <div class="hero-copy">
+      <section class="bento-hero" aria-label="${L('نظرة عامة على المنصة', 'Platform overview')}">
+        <article class="bt bt-notif" aria-live="off">
+          <div class="bt-toasts">${[
+            [L('اكتمل تقرير اللجنة الشهري', 'Monthly committee report ready'), L('أُرسل تقرير مؤشرات الجودة تلقائيًا', 'Quality indicator report sent automatically'), '07:30'],
+            [L('أُسند إجراء تصحيحي', 'Corrective action assigned'), L('CAPA-118 · المسؤول: رئيسة التمريض', 'CAPA-118 · owner: nursing head'), '09:12'],
+            [L('اعتُمد دليل CBAHI', 'CBAHI evidence approved'), L('QM.13 · سياسة الإبلاغ عن الحوادث', 'QM.13 · incident reporting policy'), '11:45']
+          ].map(([t, s, h], i) => `<div class="bt-toast" style="--d:${i}"><span class="bt-toast-ic">${ic('check', 'sm')}</span><span><b>${t}</b><small>${s}</small></span><time>${h}</time></div>`).join('')}</div>
+        </article>
+
+        <article class="bt bt-tools">
+          <h2>${L('كل وحدات الجودة في مسار واحد.', 'Every quality module, one flow.')}</h2>
+          <p>${L('15 وحدة مترابطة لا تحتاج للتنقل بين الأدوات', '15 connected modules, no tool-hopping')}</p>
+          <div class="bt-chips" aria-hidden="true">${[
+            ['report', L('بلاغات OVR', 'OVR reports')], ['search', 'RCA'], ['check-square', 'CAPA'], ['pulse', L('المؤشرات', 'Indicators')],
+            ['shield', 'CBAHI'], ['device', L('الأجهزة الطبية', 'Devices')], ['message', L('الشكاوى', 'Complaints')], ['clipboard', L('جولات الجودة', 'Rounds')]
+          ].map(([i, t], n) => `<span class="bt-chip" style="--n:${n}">${ic(i, 'sm')}${t}</span>`).join('')}</div>
+        </article>
+
+        <article class="bt bt-main">
           <span class="eyebrow">${ic('shield', 'sm')}${L('تشغيل الجودة وسلامة المرضى', 'Quality & patient safety operations')}</span>
-          <h1>${L('تربط المنصة كل بلاغ بقرار، وكل قرار بتحسين موثّق.', 'The platform connects every report to a decision, and every decision to documented improvement.')}</h1>
-          <p>${L('تعرض سلامة أعمال الجودة وسلامة المرضى بصورة عامة، وتجمع البلاغات، وتقييم الخطورة، وتحليل الأسباب، والإجراءات التصحيحية، ومؤشرات الأداء في مساحة تشغيل واحدة.', 'Salamah presents quality and patient-safety operations in one place, bringing together reports, severity assessment, root-cause analysis, corrective actions and performance indicators.')}</p>
+          <h1><em>${L('أتمِت', 'Automate')}</em> ${L('عمل الجودة.', 'quality work.')}<br>${L('ركّز على سلامة المريض.', 'Focus on patient safety.')}</h1>
+          <p>${L('من البلاغ إلى تحليل السبب الجذري، ثم الإجراء التصحيحي والمؤشر — في مساحة تشغيل واحدة.', 'From report to root cause, corrective action and indicator — in one operating space.')}</p>
           <div class="hero-actions">
             <a class="btn btn-p btn-lg" href="#/login">${L('دخول المنصة', 'Sign in to the platform')}${ic('chev', 'sm flip')}</a>
             <a class="btn btn-s btn-lg" href="#landing-flow">${L('استعرض مسار العمل', 'Explore the workflow')}</a>
           </div>
-          <ul class="hero-points" aria-label="${L('مزايا أساسية', 'Core capabilities')}">
-            <li>${ic('check', 'sm')}${L('صلاحيات بحسب الدور', 'Role-based access')}</li>
-            <li>${ic('check', 'sm')}${L('سجل تدقيق لكل إجراء', 'Audit trail for every action')}</li>
-            <li>${ic('check', 'sm')}${L('واجهة عربية وإنجليزية', 'Arabic and English interface')}</li>
-          </ul>
-        </div>
-        <div class="hero-visual" aria-label="${L('تدقيق واضح لجودة الرعاية وسلامة المريض داخل المستشفى — صورة مفاهيمية', 'A clear hospital quality and patient-safety audit — conceptual image')}">
-          <img src="assets/qmedops-patient-safety-hero-v2.png" alt="${L('فريق صحي يتحقق من هوية المريض والدواء باستخدام قائمة سلامة وعلامات تحقق واضحة', 'Healthcare team verifies patient identity and medication using a safety checklist and clear check marks')}" width="1536" height="864">
-          <div class="hero-caption"><span class="live-dot"></span><span><b>${L('تدقيق سلامة المريض', 'Patient-safety audit')}</b><small>${L('تحقق من الهوية والدواء وجودة الإجراء', 'Identity, medication and process verification')}</small></span></div>
-          <div class="hero-signal signal-a">${ic('alert', 'sm')}<span><b>${L('تقييم الخطورة', 'Severity review')}</b><small>SAL · 4 × 4</small></span></div>
-          <div class="hero-signal signal-b">${ic('check-square', 'sm')}<span><b>${L('إجراء تصحيحي', 'Corrective action')}</b><small>${L('مسؤول · موعد · تحقق', 'Owner · due date · verification')}</small></span></div>
-        </div>
+          <div class="bt-stage" aria-hidden="true">
+            <div class="bt-win w1"><i></i><i></i><i></i><div class="bt-win-b"><span></span><span></span><span class="s"></span></div></div>
+            <div class="bt-win w2"><i></i><i></i><i></i><div class="bt-win-b"><aside></aside><div><span class="chip crit">SAL 20</span><span class="ln"></span><span class="ln s"></span><span class="ln"></span></div></div></div>
+            <div class="bt-pill p1">${ic('check', 'sm')}${L('أُسند الإجراء التصحيحي', 'CAPA assigned')}</div>
+            <div class="bt-pill p2">${ic('alert', 'sm')}OVR-2026-1048</div>
+            <svg class="bt-cursor" viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg>
+          </div>
+        </article>
+
+        <article class="bt bt-chart">
+          <span class="bt-tag">${L('رؤى الأداء', 'Performance insights')}</span>
+          <b class="bt-big">24</b>
+          <small>${L('إجراءً تصحيحيًا أُغلق هذا الأسبوع', 'corrective actions closed this week')}</small>
+          <div class="bt-bars" aria-hidden="true">${[[2, L('سبت', 'Sat')], [5, L('أحد', 'Sun')], [9, L('إثن', 'Mon')], [12, L('ثلا', 'Tue')], [16, L('أرب', 'Wed')], [19, L('خمي', 'Thu')], [24, L('جمع', 'Fri')]].map(([v, d], i, a) => `<div style="--h:${Math.round(v / 24 * 100)}%;--i:${i}"${i === a.length - 1 ? ' class="hi"' : ''}><span><em>${v}</em></span><small>${d}</small></div>`).join('')}</div>
+        </article>
+
+        <article class="bt bt-search">
+          <h2>${L('ابحث عن أي شيء فورًا', 'Find anything instantly')}</h2>
+          <a class="bt-sbox" href="#/login" aria-label="${L('دخول المنصة للبحث', 'Sign in to search')}">${ic('search', 'sm')}<span class="bt-type" data-words="${esc(JSON.stringify([L('ابحث في البلاغات والسياسات والأجهزة…', 'Search reports, policies, devices…'), 'OVR-2026-1048', L('سياسة نقل الدم', 'Blood transfusion policy'), L('جهاز تنفس صناعي — العناية المركزة', 'Ventilator — ICU'), 'CBAHI QM.13']))}"></span><i class="caret"></i></a>
+        </article>
       </section>
 
       <section class="landing-band" aria-label="${L('نطاق المنصة', 'Platform scope')}">
@@ -403,7 +447,7 @@ Q.views.dashboard = {perm: 'dashboard', render() {
   const rank = {crit: 0, med: 1, ok: 2, mute: 3};
   const kpick = kpis.sort((a, b) => rank[a.st] - rank[b.st]).slice(0, 4);
   const sx = sentinels[0];
-  return {title: L('مركز العمليات', 'Operations center'), mount: r => Q.bindCharts(r), html: `
+  return {title: L('مركز العمليات', 'Operations center'), cls: 'dash-bento', mount: r => Q.bindCharts(r), html: `
   ${pending ? `<div class="banner"><div class="ico">${ic('alert')}</div>
     <div><b>${L('حدث جسيم', 'Sentinel event')} · ${Q.dname(pending.deptId)}</b><p><a class="oid" href="#/incidents/${pending.id}">${pending.id}</a> · ${esc(T(pending.title))} · ${L('لم يُسجَّل الإخطار الخارجي بعد', 'external notice not yet logged')}</p></div>
     <div class="act"><span class="clock">${ic('clock', 'sm')}${Q.rel(Q.add(pending.occurredAt, Q.S().externalHours * Q.HOUR)).txt}</span>${Q.can('incident.review') ? `<button class="btn btn-d sm" data-act="external" data-id="${pending.id}">${ic('send')}${L('تسجيل الإخطار', 'Log notice')}</button>` : ''}<a class="btn btn-s sm" href="#/incidents/${pending.id}">${L('التفاصيل', 'Details')}</a></div></div>` : ''}
