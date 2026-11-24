@@ -14,3 +14,5 @@ tests/e2e/profile/
 tests/e2e/results.json
 tests/e2e/evidence.pdf
 node_modules/
+# local private accounts (emails + password hashes)
+js/accounts.local.js

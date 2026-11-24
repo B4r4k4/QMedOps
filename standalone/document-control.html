@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Document Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===================== Design tokens ===================== */
+:root{
+  --bg:#f4f5f4; --card:#fff; --ink:#15211f; --ink2:#5b6664; --line:#e3e7e6; --soft:#eef1f0;
+  --brand:#0f6b6b; --brand-ink:#fff; --brand-soft:#e3f1f1;
+  --red:#b42318; --red-soft:#fdecea; --amber:#b54708; --amber-soft:#fff4e0; --amber-bar:#e8a33a;
+  --ok:#0f6b6b; --ok-soft:#e3f1f1; --info:#175cd3; --info-soft:#e8f0fe; --mute:#6b7472; --mute-soft:#eef1f0;
+  --radius:12px; --shadow:0 1px 2px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1514; --card:#172020; --ink:#e7eeec; --ink2:#9aa7a4; --line:#26302f; --soft:#1e2928;
+  --brand:#3fb3ad; --brand-ink:#04211f; --brand-soft:#173634;
+  --red:#ff7a6e; --red-soft:#3a1c1a; --amber:#f5b54a; --amber-soft:#3a2b14; --ok:#3fb3ad; --ok-soft:#173634;
+  --info:#7fb0ff; --info-soft:#1a2740; --mute:#9aa7a4; --mute-soft:#1e2928;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f1514; --card:#172020; --ink:#e7eeec; --ink2:#9aa7a4; --line:#26302f; --soft:#1e2928;
+  --brand:#3fb3ad; --brand-ink:#04211f; --brand-soft:#173634;
+  --red:#ff7a6e; --red-soft:#3a1c1a; --amber:#f5b54a; --amber-soft:#3a2b14; --ok:#3fb3ad; --ok-soft:#173634;
+  --info:#7fb0ff; --info-soft:#1a2740; --mute:#9aa7a4; --mute-soft:#1e2928;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans Arabic",system-ui,sans-serif}
+a{color:var(--brand);text-decoration:none} a:hover{text-decoration:underline}
+h1,h2,h3{margin:0;line-height:1.3} h1{font-size:20px} h2{font-size:20px} h3{font-size:15px}
+small,.muted{color:var(--ink2)}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.top small{display:block}
+main{max-width:1400px;margin:0 auto;padding:20px 24px 48px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.page-head p{margin:4px 0 0;color:var(--ink2)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--card);color:var(--ink)}
+.btn-p{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn-d{background:var(--red);border-color:var(--red);color:#fff}
+.btn-g{background:none;border:none;color:var(--ink2);font:inherit;cursor:pointer;padding:8px}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:focus-visible,.btn-g:focus-visible,.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+select.field,.fld input,.fld select,.fld textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.stat-l{color:var(--ink2);font-size:13px}
+.stat-v{font-size:26px;font-weight:700;margin:4px 0}
+.stat-v small{font-size:13px} .stat-v.bad{color:var(--red)}
+.stat-s{font-size:12.5px;color:var(--ink2)}
+.c-crit{color:var(--red)}
+.track{height:6px;background:var(--soft);border-radius:4px;overflow:hidden}
+.track i{display:block;height:100%}
+/* card + table */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--line)}
+.card-h p{margin:2px 0 0;color:var(--ink2);font-size:13px}
+.card-b{padding:14px 16px}
+.toolbar{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.seg{display:flex;gap:2px;background:var(--soft);border-radius:9px;padding:3px;overflow-x:auto;max-width:100%}
+.seg button{border:none;background:none;font:inherit;color:var(--ink2);padding:6px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+.seg button small{margin-inline-start:4px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;color:var(--ink2);font-size:13px;text-align:start;padding:10px 16px;background:var(--soft)}
+td{padding:12px 16px;border-top:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--soft)}
+.oid{display:block;color:var(--brand);font-weight:600;direction:ltr;unicode-bidi:isolate}
+.t1{display:block;font-weight:500} .t2{display:block;font-size:12.5px;color:var(--ink2)}
+.nowrap{white-space:nowrap}
+.due{font-size:13px} .due.late{color:var(--red);font-weight:600} .due.soon{color:var(--amber);font-weight:600}
+.chip{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.crit{background:var(--red-soft);color:var(--red)}
+.chip.med{background:var(--amber-soft);color:var(--amber)} .chip.info{background:var(--info-soft);color:var(--info)}
+.chip.mute{background:var(--mute-soft);color:var(--mute)}
+.empty{padding:32px;text-align:center;color:var(--ink2)}
+/* banners */
+.banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:var(--radius);background:var(--amber-soft);margin-bottom:16px}
+.banner.info{background:var(--info-soft)} .banner p{margin:2px 0 0} .banner .act{margin-inline-start:auto}
+/* detail */
+.crumbs{display:flex;gap:6px;color:var(--ink2);margin-bottom:10px}
+.detail{display:grid;grid-template-columns:1fr 300px;gap:16px}
+.detail-main>.card{margin-bottom:16px}
+dl.meta{margin:0;display:grid;gap:12px} dl.meta dt{font-size:12.5px;color:var(--ink2)} dl.meta dd{margin:0}
+.sign-chain{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.sign-chain li{display:flex;gap:10px;align-items:flex-start}
+.sign-chain .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex:none;font-size:12px}
+.sign-chain li.done .dot{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.sign-chain li.cur .dot{border-color:var(--amber)}
+.hint{font-size:12.5px;color:var(--ink2);margin:2px 0 0}
+ol.log{margin:0;padding:0;list-style:none;display:grid;gap:8px} ol.log .t{color:var(--ink2);font-size:12.5px;margin-inline-end:8px}
+/* modal */
+dialog{border:none;border-radius:14px;padding:0;width:min(640px,calc(100vw - 32px));background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog form{padding:20px}
+.mbody{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.fld{display:grid;gap:4px;border:none;padding:0;margin:0} .fld span,.fld legend{font-size:13px;color:var(--ink2)}
+.w{grid-column:1/-1}
+.chk{display:flex;gap:6px;align-items:center}
+.multi{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mfoot{display:flex;gap:8px;justify-content:flex-end}
+.err{color:var(--red);margin:0 0 10px}
+.toast{position:fixed;bottom:20px;inset-inline-start:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:9;max-width:90vw}
+[dir=rtl] .toast{transform:translateX(50%)}
+.toast.err{background:var(--red);color:#fff}
+@media (max-width:900px){.stats{grid-template-columns:1fr 1fr}.detail{grid-template-columns:1fr}.hide-m{display:none}}
+@media (max-width:560px){main,.top{padding-inline:16px}.stats{grid-template-columns:1fr}.mbody,.multi{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><small id="today"></small><h1 id="ptitle"></h1></div>
+  <div class="row">
+    <label class="row"><small id="whoLbl"></small><select class="field" id="who"></select></label>
+    <button class="btn" id="langBtn" type="button"></button>
+  </div>
+</header>
+<main id="app"></main>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+
+<script>
+/* =====================================================================
+   DOCUMENT CONTROL: POLICIES, PROCEDURES, FORMS & PLANS (standalone)
+   Prepare → multi-step review & approval with e-signature → in force
+   → periodic review → read-and-sign with a deadline.
+   Data lives in localStorage; swap load()/save() for your own API.
+   ===================================================================== */
+const CFG = {reviewYears: 3, ackDays: 30, alertDays: 60};
+const DAY = 864e5, KEY = 'doc-control-v1';
+
+/* ---------- storage (wrapped: localStorage can throw) ---------- */
+const store = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+/* ---------- i18n + utils ---------- */
+let lang = store.get(KEY + ':lang') || 'ar';
+const L = (ar, en) => lang === 'ar' ? ar : en;
+const T = v => Array.isArray(v) ? (lang === 'ar' ? v[0] : v[1]) : v && typeof v === 'object' ? (v[lang] || v.ar || v.en || '') : (v || '');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const $ = (s, r = document) => r.querySelector(s);
+const now = () => new Date();
+const iso = d => new Date(d).toISOString();
+const addDays = (d, n) => new Date(+new Date(d) + n * DAY);
+const toInput = d => iso(d).slice(0, 10);
+const fDate = d => new Date(d).toLocaleDateString(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+const rel = d => { const n = Math.ceil((new Date(d) - now()) / DAY);
+  return n < 0 ? L(`متأخرة ${-n} يومًا`, `${-n}d overdue`) : n === 0 ? L('اليوم', 'today') : L(`بعد ${n} يومًا`, `in ${n} days`); };
+const uid = p => p + '-' + Math.random().toString(36).slice(2, 9);
+function toast(msg, kind = '') { const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); }
+
+/* ---------- reference data (replace with your own) ---------- */
+const DEPTS = {qps: ['الجودة وسلامة المرضى', 'Quality & patient safety'], nicu: ['العناية المركزة لحديثي الولادة', 'Neonatal ICU'], ph: ['الصيدلية', 'Pharmacy'], fms: ['المرافق والسلامة', 'Facility management'], er: ['الطوارئ', 'Emergency']};
+const USERS = [
+  {id: 'u1', name: ['هند الدوسري', 'Hind Aldosari'], dept: 'qps', role: 'director'},
+  {id: 'u10', name: ['منى العتيبي', 'Mona Alotaibi'], dept: 'qps', role: 'quality'},
+  {id: 'u2', name: ['د. ريم الحربي', 'Dr. Reem Alharbi'], dept: 'nicu', role: 'supervisor'},
+  {id: 'u3', name: ['د. ماجد العمري', 'Dr. Majed Alomari'], dept: 'ph', role: 'supervisor'},
+  {id: 'u4', name: ['م. خالد سعد', 'Eng. Khalid Saad'], dept: 'fms', role: 'supervisor'},
+  {id: 'u5', name: ['سارة القحطاني', 'Sara Alqahtani'], dept: 'nicu', role: 'staff'},
+  {id: 'u6', name: ['نورة الشهري', 'Noura Alshehri'], dept: 'nicu', role: 'staff'},
+  {id: 'u7', name: ['فهد الغامدي', 'Fahad Alghamdi'], dept: 'er', role: 'staff'},
+  {id: 'u8', name: ['ليلى الزهراني', 'Layla Alzahrani'], dept: 'er', role: 'staff'},
+  {id: 'u9', name: ['عبدالله المطيري', 'Abdullah Almutairi'], dept: 'ph', role: 'staff'}
+];
+const ROLES = {director: ['مدير الجودة', 'Quality director'], quality: ['أخصائي جودة', 'Quality specialist'], supervisor: ['رئيس قسم', 'Department head'], staff: ['موظف', 'Staff']};
+const PERM = {director: ['view', 'edit', 'approve'], quality: ['view', 'edit', 'approve'], supervisor: ['view', 'edit'], staff: ['view']};
+
+const POL_ST = {draft: ['مسودة', 'Draft', 'mute'], review: ['قيد المراجعة والاعتماد', 'In review & approval', 'med'], approved: ['معتمدة وسارية', 'Approved, in force', 'ok'], archived: ['موقوفة', 'Retired', 'mute']};
+const POL_CAT = {admin: ['إدارية', 'Administrative'], clinical: ['سريرية', 'Clinical'], ipc: ['مكافحة العدوى', 'Infection control'], safety: ['سلامة المرضى', 'Patient safety'], mm: ['الأدوية', 'Medication'], fms: ['المرافق والسلامة', 'Facility & safety'], hr: ['الموارد البشرية', 'Human resources']};
+const DOC_KIND = {policy: ['سياسة', 'Policy'], procedure: ['إجراء', 'Procedure'], form: ['نموذج', 'Form'], plan: ['خطة', 'Plan']};
+const ACT_TXT = {created: ['أُنشئت', 'Created'], updated: ['عُدّلت', 'Updated'], submitted: ['أُرسلت للمراجعة', 'Sent for review'], signed_review: ['وُقّعت المراجعة', 'Review signed'], signed: ['وُقّع الاعتماد', 'Approval signed'], approved: ['اعتُمدت ونُشرت', 'Approved & published'], returned: ['رُفضت وأُعيدت', 'Rejected & returned'], revision: ['بدأ إصدار جديد', 'Revision started'], reviewed: ['رُوجعت دون تعديل', 'Reviewed, no change'], archived: ['أُوقفت', 'Retired']};
+
+/* ---------- state ---------- */
+let S;
+const save = () => store.set(KEY, S);
+const me = () => USERS.find(u => u.id === S.me) || USERS[0];
+const uname = id => { const u = USERS.find(x => x.id === id); return u ? T(u.name) : '—'; };
+const can = (p, u = me()) => (PERM[u.role] || []).includes(p);
+const getDoc = id => S.docs.find(d => d.id === id);
+const scopeName = id => id === 'all' ? L('كل المنشأة', 'Whole facility') : T(DEPTS[id]);
+const kindName = p => T(DOC_KIND[p.kind || 'policy']);
+
+/* ---------- business rules (same as QMedOps) ---------- */
+const polInForce = p => !!p.live && p.status !== 'archived';
+const polOverdue = p => polInForce(p) && !!p.reviewDue && new Date(p.reviewDue) < now();
+const polDueSoon = p => polInForce(p) && !!p.reviewDue && !polOverdue(p) && new Date(p.reviewDue) < addDays(now(), CFG.alertDays);
+const audience = p => USERS.filter(u => (p.deptId || 'all') === 'all' || u.dept === p.deptId);
+const ackPct = p => { const a = audience(p); if (!a.length) return null; return Math.round(a.filter(u => (p.acks || {})[u.id]).length / a.length * 100); };
+const ackLate = p => polInForce(p) && p.ackRequired !== false && !!p.ackDue && new Date(p.ackDue) < now() && (ackPct(p) ?? 100) < 100;
+const canEdit = (p, u = me()) => can('edit', u) && (u.role !== 'supervisor' || p.deptId === u.dept || p.ownerId === u.id);
+/* approval chain: reviewers then approvers, in order, every one required */
+const chainOf = p => [...(p.reviewers || []).map(id => ({id, step: 'review'})), ...(p.approvers || []).map(id => ({id, step: 'approve'}))];
+const nextSigner = p => { if (p.status !== 'review') return null;
+  const signed = new Set((p.signatures || []).filter(s => s.decision !== 'reject').map(s => s.userId));
+  const c = chainOf(p); if (!c.length) return {id: null, step: 'approve'};
+  return c.find(x => !signed.has(x.id)) || null; };
+/* separation of duties: the preparer of a version never signs it */
+const canSign = (p, u = me()) => { const n = nextSigner(p); if (!n || p.preparedBy === u.id) return false; return n.id ? n.id === u.id : can('approve', u); };
+const visible = (p, u = me()) => p.status !== 'archived' || can('edit', u);
+const hist = (p, action, note = '') => (p.history = p.history || []).push({v: p.version, action, by: me().id, at: iso(now()), note});
+const polChip = p => `<span class="chip ${polOverdue(p) ? 'crit' : POL_ST[p.status][2]}">${polOverdue(p) ? L('متأخرة المراجعة', 'Review overdue') : T(POL_ST[p.status])}</span>`;
+
+/* ---------- demo seed ---------- */
+function seed() {
+  const t = now(), docs = [];
+  const P = (code, ar, en, cat, dept, owner, effAgo, reviewIn, o = {}) => {
+    const eff = addDays(t, effAgo), v = o.v || 1;
+    const p = {id: 'pol-' + code.toLowerCase(), code, kind: o.kind || 'policy', title: {ar, en}, category: cat, deptId: dept, ownerId: owner,
+      ackRequired: true, summary: o.sum || {ar: '', en: ''}, standards: o.std || [], linkedPolicyId: o.link || null,
+      version: v, status: 'approved', preparedBy: owner, reviewers: [], approvers: ['u1'], signatures: [], acks: {},
+      history: [{v, action: 'approved', by: 'u1', at: iso(eff), note: ''}],
+      live: {version: v, effectiveAt: iso(eff), approvedBy: 'u1', signers: ['u1']}, reviewDue: iso(addDays(t, reviewIn)), ackDue: iso(addDays(eff, CFG.ackDays))};
+    const aud = audience(p); aud.slice(0, Math.round(aud.length * (o.ack ?? 1))).forEach(u => p.acks[u.id] = iso(addDays(eff, 3)));
+    docs.push(p); return p; };
+  P('QPS-POL-001', 'خطة تحسين الجودة وسلامة المرضى', 'Quality improvement & patient safety plan', 'safety', 'all', 'u1', -300, 795, {std: ['QM.1', 'QM.2'], sum: {ar: 'الإطار العام لبرنامج الجودة وأولويات التحسين السنوية.', en: 'Framework of the quality programme and annual improvement priorities.'}});
+  P('QPS-POL-004', 'الإبلاغ عن الحوادث والأحداث الوشيكة (OVR)', 'Occurrence variance reporting (OVR)', 'safety', 'all', 'u10', -420, 675, {std: ['QM.13'], ack: .9});
+  P('QPS-POL-007', 'إدارة الأحداث الجسيمة وتحليل السبب الجذري', 'Sentinel events & root cause analysis', 'safety', 'all', 'u1', -1110, -15, {std: ['QM.13'], ack: .9});
+  P('IPC-POL-003', 'نظافة الأيدي', 'Hand hygiene', 'ipc', 'all', 'u1', -200, 891, {ack: .7});
+  P('FMS-POL-005', 'السلامة من الحريق وخطة الإخلاء', 'Fire safety & evacuation plan', 'fms', 'all', 'u4', -100, 1031, {ack: .5});
+  P('NICU-POL-002', 'تعريف حديثي الولادة', 'Newborn identification', 'clinical', 'nicu', 'u2', -500, 591);
+  P('QPS-FRM-004', 'نموذج بلاغ الحادث', 'Occurrence report form', 'safety', 'all', 'u10', -400, 700, {kind: 'form', link: 'pol-qps-pol-004'});
+  const ph = P('PH-POL-011', 'الأدوية عالية الخطورة', 'High-alert medications', 'mm', 'all', 'u3', -1080, 16, {v: 2});
+  Object.assign(ph, {version: 3, status: 'review', preparedBy: 'u3', reviewers: ['u10'], approvers: ['u1'],
+    signatures: [{userId: 'u10', step: 'review', decision: 'reviewed', comment: '', at: iso(addDays(t, -2))}]});
+  ph.history.push({v: 3, action: 'submitted', by: 'u3', at: iso(addDays(t, -5)), note: ''}, {v: 3, action: 'signed_review', by: 'u10', at: iso(addDays(t, -2)), note: ''});
+  docs.push({id: 'pol-qps-pro-002', code: 'QPS-PRO-002', kind: 'procedure', title: {ar: 'خطوات تحليل السبب الجذري', en: 'Root cause analysis steps'}, category: 'safety', deptId: 'all', ownerId: 'u10',
+    ackRequired: true, summary: {ar: '', en: ''}, standards: [], linkedPolicyId: 'pol-qps-pol-007', version: 1, status: 'draft', preparedBy: 'u10',
+    reviewers: [], approvers: [], signatures: [], acks: {}, history: [{v: 1, action: 'created', by: 'u10', at: iso(addDays(t, -3)), note: ''}], live: null, reviewDue: null, ackDue: null});
+  const hr = P('HR-POL-001', 'الزي الرسمي', 'Dress code', 'hr', 'all', 'u1', -1500, -400); hr.status = 'archived';
+  return {docs, me: 'u1', tab: 'force', kind: 'all'};
+}
+S = store.get(KEY) || seed();
+
+/* ---------- form helpers ---------- */
+const fText = (n, label, v = '', o = {}) => `<label class="fld ${o.w ? 'w' : ''}"><span>${label}${o.req ? ' *' : ''}</span><input name="${n}" type="${o.type || 'text'}" value="${esc(v)}" ${o.req ? 'required' : ''} ${o.ltr ? 'dir="ltr"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.attrs || ''}></label>`;
+const fSel = (n, label, opts, v, o = {}) => `<label class="fld ${o.w ? 'w' : ''}"><span>${label}</span><select name="${n}">${o.empty != null ? `<option value="">${o.empty}</option>` : ''}${opts.map(([k, t]) => `<option value="${esc(k)}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+const fArea = (n, label, v = '', o = {}) => `<label class="fld w"><span>${label}${o.req ? ' *' : ''}</span><textarea name="${n}" rows="${o.rows || 3}" ${o.req ? 'required' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''}>${esc(v)}</textarea></label>`;
+const fChk = (n, label, on, o = {}) => `<label class="chk w"><input type="checkbox" name="${n}" ${on ? 'checked' : ''} ${o.req ? 'required' : ''}> ${label}</label>`;
+const fMulti = (n, label, opts, sel) => `<fieldset class="fld w"><legend>${label}</legend><div class="multi">${opts.map(([k, t]) => `<label class="chk"><input type="checkbox" name="${n}" value="${esc(k)}" ${sel.includes(k) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div></fieldset>`;
+const userOpts = f => USERS.filter(f).map(u => [u.id, `${T(u.name)} · ${T(ROLES[u.role])}`]);
+
+function modal({title, sub = '', body, submit = L('حفظ', 'Save'), danger, onSubmit}) {
+  const d = $('#dlg'), f = $('#dlgForm');
+  f.innerHTML = `<h3>${title}</h3>${sub ? `<p class="muted" style="margin:2px 0 0">${sub}</p>` : ''}<div class="mbody">${body}</div><p class="err" hidden></p>
+    <div class="mfoot"><button class="btn" value="cancel" formnovalidate>${L('إلغاء', 'Cancel')}</button><button class="btn ${danger ? 'btn-d' : 'btn-p'}" value="ok">${submit}</button></div>`;
+  f.onsubmit = e => {
+    if (e.submitter && e.submitter.value === 'cancel') return;
+    e.preventDefault();
+    const fd = new FormData(f), data = {};
+    for (const k of new Set(fd.keys())) { const all = fd.getAll(k); data[k] = all.length > 1 ? all : all[0]; }
+    try { onSubmit(data); d.close(); save(); render(); }
+    catch (err) { const el = $('.err', f); el.textContent = err.message; el.hidden = false; }
+  };
+  d.showModal();
+}
+
+/* ---------- views ---------- */
+const stat = (label, value, sub, o = {}) => `<div class="stat"><div class="stat-l">${label}</div><div class="stat-v ${o.bad ? 'bad' : ''}">${value}</div><div class="stat-s">${sub}</div></div>`;
+const track = (v, color) => `<div class="track"><i style="width:${v || 0}%;background:${color}"></i></div>`;
+
+function listView() {
+  const tab = S.tab || 'force', kind = S.kind || 'all';
+  const all = S.docs.filter(p => visible(p) && (kind === 'all' || (p.kind || 'policy') === kind));
+  const tabs = [
+    ['force', L('السارية', 'In force'), polInForce],
+    ['overdue', L('متأخرة المراجعة', 'Review overdue'), polOverdue],
+    ['soon', L('تقترب من المراجعة', 'Review due soon'), polDueSoon],
+    ['ack', L('الاطلاع دون 100% بعد المهلة', 'Read-and-sign late'), ackLate],
+    ['work', L('قيد الإعداد والاعتماد', 'Being prepared / approved'), p => ['draft', 'review'].includes(p.status)]];
+  if (can('edit')) tabs.push(['archived', L('الموقوفة', 'Retired'), p => p.status === 'archived']);
+  tabs.push(['all', L('الكل', 'All'), () => true]);
+  const fn = (tabs.find(t => t[0] === tab) || tabs[0])[2];
+  const list = all.filter(fn).sort((a, b) => (polOverdue(b) - polOverdue(a)) || String(a.code).localeCompare(b.code));
+  const force = all.filter(polInForce), od = all.filter(polOverdue), late = all.filter(ackLate);
+  const myUnread = force.filter(p => p.ackRequired !== false && audience(p).some(u => u.id === me().id) && !(p.acks || {})[me().id]);
+  const ackVals = force.filter(p => p.ackRequired !== false).map(ackPct).filter(v => v != null);
+  const ackAvg = ackVals.length ? Math.round(ackVals.reduce((a, b) => a + b, 0) / ackVals.length) : null;
+  $('#ptitle').textContent = L('السياسات والإجراءات', 'Policies & procedures');
+  return `
+  <div class="page-head"><div><h2>${L('ضبط الوثائق: السياسات والإجراءات والنماذج', 'Document control: policies, procedures & forms')}</h2>
+    <p>${L(`إعداد ← مراجعة واعتماد متعدد الخطوات بتوقيع إلكتروني ← سريان ← مراجعة كل ${CFG.reviewYears} سنوات · إقرار الاطلاع خلال ${CFG.ackDays} يومًا`, `Prepare → multi-step review & approval with e-signature → in force → review every ${CFG.reviewYears} years · read-and-sign within ${CFG.ackDays} days`)}</p></div>
+    <div class="row">${can('edit') ? `<button class="btn" data-act="export">⤓ ${L('تصدير', 'Export')}</button><button class="btn btn-p" data-act="new">＋ ${L('وثيقة جديدة', 'New document')}</button>` : ''}</div></div>
+  ${myUnread.length ? `<div class="banner info"><div><b>${L(`${myUnread.length} وثائق بانتظار إقرارك بالاطلاع`, `${myUnread.length} documents awaiting your read-and-sign`)}</b><p>${myUnread.slice(0, 4).map(p => `<a class="ltr" href="#/doc/${encodeURIComponent(p.id)}">${esc(p.code)}</a>`).join(' · ')}</p></div></div>` : ''}
+  <div class="stats">
+    ${stat(L('وثائق سارية', 'In force'), force.length, Object.keys(DOC_KIND).map(k => `${force.filter(p => (p.kind || 'policy') === k).length} ${T(DOC_KIND[k])}`).join(' · '))}
+    ${stat(L('متأخرة المراجعة', 'Review overdue'), od.length, od.length ? L('تُعد مانعًا لجاهزية CBAHI', 'Counts as a CBAHI readiness blocker') : L('لا يوجد تأخير', 'None overdue'), {bad: od.length})}
+    ${stat(L('بانتظار توقيعات', 'Awaiting signatures'), all.filter(p => p.status === 'review').length, L(`${all.filter(polDueSoon).length} تقترب من المراجعة`, `${all.filter(polDueSoon).length} review due soon`))}
+    ${stat(L('متوسط الإقرار بالاطلاع', 'Average read-and-sign'), ackAvg != null ? `${ackAvg}<small>%</small>` : '—', late.length ? `<b class="c-crit">${L(`${late.length} تجاوزت المهلة دون 100%`, `${late.length} below 100% past deadline`)}</b>` : (ackAvg != null ? track(ackAvg, 'var(--brand)') : ''))}
+  </div>
+  <section class="card">
+    <div class="toolbar"><div class="seg" role="tablist">${tabs.map(([k, t, f]) => `<button role="tab" class="${k === tab ? 'on' : ''}" data-act="tab" data-v="${k}">${t}<small>${all.filter(f).length}</small></button>`).join('')}</div>
+      <select class="field" id="kindSel" aria-label="${L('نوع الوثيقة', 'Document type')}">${[['all', L('كل الأنواع', 'All types')], ...Object.entries(DOC_KIND).map(([k, v]) => [k, T(v)])].map(([k, t]) => `<option value="${k}" ${kind === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="tbl-wrap"><table><thead><tr><th>${L('الرمز', 'Code')}</th><th>${L('الوثيقة', 'Document')}</th><th class="hide-m">${L('النطاق', 'Scope')}</th><th class="hide-m">${L('الإصدار', 'Version')}</th><th>${L('المراجعة القادمة', 'Next review')}</th><th class="hide-m">${L('الاطلاع', 'Read')}</th><th>${L('الحالة', 'Status')}</th></tr></thead>
+    <tbody>${list.length ? list.map(p => { const showR = p.reviewDue && polInForce(p), ack = polInForce(p) && p.ackRequired !== false ? ackPct(p) : null; return `<tr class="click" data-href="#/doc/${encodeURIComponent(p.id)}">
+      <td class="nowrap"><span class="oid">${esc(p.code)}</span><span class="t2">${kindName(p)}</span></td>
+      <td><span class="t1">${esc(T(p.title))}</span><span class="t2">${T(POL_CAT[p.category] || POL_CAT.admin)} · ${esc(uname(p.ownerId))}</span></td>
+      <td class="hide-m">${scopeName(p.deptId)}</td>
+      <td class="hide-m">${p.live ? `v${p.live.version}` : '—'}${['draft', 'review'].includes(p.status) && p.live ? ` <small>→ v${p.version}</small>` : ''}</td>
+      <td class="nowrap">${showR ? `${fDate(p.reviewDue)}<br><span class="due ${polOverdue(p) ? 'late' : polDueSoon(p) ? 'soon' : ''}">${rel(p.reviewDue)}</span>` : '—'}</td>
+      <td class="hide-m ${ack != null && ack < 100 ? 'c-crit' : ''}">${ack != null ? `${ack}%` : '—'}</td><td>${polChip(p)}</td></tr>`; }).join('')
+      : `<tr><td colspan="7"><div class="empty">${L('لا توجد وثائق في هذا التصنيف.', 'No documents in this view.')}</div></td></tr>`}</tbody></table></div>
+  </section>`;
+}
+
+function detailView(id) {
+  const p = getDoc(id);
+  $('#ptitle').textContent = p ? p.code : '—';
+  if (!p) return `<div class="empty">${L('الوثيقة غير موجودة.', 'Document not found.')}</div>`;
+  if (!visible(p)) return `<div class="empty">${L('أُوقف العمل بهذه الوثيقة ولم تعد متاحة.', 'This document has been retired and is no longer available.')}</div>`;
+  const ed = canEdit(p), sign = canSign(p), force = polInForce(p), next = nextSigner(p), id_ = esc(p.id);
+  const aud = audience(p), acked = aud.filter(u => (p.acks || {})[u.id]), mine = aud.some(u => u.id === me().id) && force && p.ackRequired !== false;
+  const linked = p.linkedPolicyId && getDoc(p.linkedPolicyId), children = S.docs.filter(x => x.linkedPolicyId === p.id && visible(x));
+  const chain = chainOf(p), sigs = p.signatures || [];
+  const acts = [];
+  if (p.status === 'draft' && ed) acts.push(`<button class="btn btn-p" data-act="submit" data-id="${id_}">${L('إرسال للمراجعة والاعتماد', 'Send for review & approval')}</button>`);
+  if (sign) acts.push(`<button class="btn btn-p" data-act="sign" data-id="${id_}">✓ ${next.step === 'review' ? L('توقيع المراجعة', 'Sign review') : L('اعتماد بتوقيع إلكتروني', 'Approve with e-signature')}</button>`, `<button class="btn" data-act="return" data-id="${id_}">${L('رفض وإعادة للمُعد', 'Reject, return to author')}</button>`);
+  if (p.status === 'review' && !sign && next && next.id === me().id && p.preparedBy === me().id) acts.push(`<span class="muted">${L('لا يوقّع مُعدّ الإصدار عليه', 'The preparer cannot sign their own version')}</span>`);
+  if (p.status === 'approved' && ed) acts.push(`<button class="btn" data-act="revise" data-id="${id_}">${L('بدء مراجعة / إصدار جديد', 'Start revision / new version')}</button>`);
+  if (p.status === 'approved' && can('approve')) acts.push(`<button class="btn" data-act="reviewed" data-id="${id_}">${L('رُوجعت دون تعديل', 'Reviewed, no change')}</button>`);
+  if (['draft', 'review'].includes(p.status) && ed) acts.push(`<button class="btn" data-act="edit" data-id="${id_}">${L('تعديل', 'Edit')}</button>`);
+  if (p.status !== 'archived' && can('approve')) acts.push(`<button class="btn-g" data-act="archive" data-id="${id_}">${L('إيقاف العمل بها', 'Retire')}</button>`);
+  const pct = ackPct(p);
+  return `
+  <nav class="crumbs"><a href="#/">${L('السياسات والإجراءات', 'Policies & procedures')}</a><span>›</span><span class="ltr">${esc(p.code)}</span></nav>
+  <div class="page-head"><div><div class="row">${polChip(p)}<span class="chip mute">${kindName(p)}</span><span class="chip mute">${T(POL_CAT[p.category] || POL_CAT.admin)}</span>${p.live ? `<span class="chip info">${L('الإصدار الساري', 'In force')} v${p.live.version}</span>` : ''}${['draft', 'review'].includes(p.status) && ed ? `<span class="chip med">${L('قيد العمل', 'Working on')} v${p.version}</span>` : ''}</div>
+    <h2 style="margin-top:8px">${esc(T(p.title))}</h2><p>${esc(T(p.summary))}</p></div><div class="row">${acts.join('')}</div></div>
+  ${p.status === 'archived' ? `<div class="banner"><div><b>${L('وثيقة موقوفة', 'Retired document')}</b><p>${L('مخفية عن الموظفين تلقائيًا.', 'Automatically hidden from staff.')}</p></div></div>` : ''}
+  ${p.returnNote && p.status === 'draft' && ed ? `<div class="banner"><div><b>${L('رُفضت وأُعيدت للتعديل', 'Rejected and returned for changes')}</b><p>${esc(p.returnNote)}</p></div></div>` : ''}
+  ${polOverdue(p) ? `<div class="banner"><div><b>${L('تجاوزت موعد المراجعة الدورية', 'Past its periodic review date')}</b><p>${L('ما زالت سارية لكن يجب مراجعتها أو تأكيدها دون تعديل.', 'Still in force, but it must be revised or confirmed unchanged.')}</p></div></div>` : ''}
+  ${mine && !(p.acks || {})[me().id] ? `<div class="banner info"><div><b>${L('مطلوب إقرارك بالاطلاع', 'Please confirm you have read this document')}</b><p>${p.ackDue ? `${L('المهلة', 'Deadline')} ${fDate(p.ackDue)} · ${rel(p.ackDue)}` : ''}</p></div><div class="act"><button class="btn btn-p sm" data-act="ack" data-id="${id_}">✓ ${L('قرأتها وفهمتها', 'I have read and understood')}</button></div></div>` : ''}
+  <div class="detail"><div class="detail-main">
+    ${p.status === 'review' ? `<section class="card"><div class="card-h"><div><h3>${L('مسار المراجعة والاعتماد', 'Review & approval path')} · v${p.version}</h3><p>${L('بالترتيب، وكل توقيع مطلوب. أي رفض يعيد الوثيقة للمُعد.', 'In order; every signature is required. Any rejection returns it to the author.')}</p></div></div>
+      <div class="card-b">${chain.length ? `<ol class="sign-chain">${chain.map(c => { const s = sigs.find(x => x.userId === c.id && x.decision !== 'reject'), cur = next && next.id === c.id;
+        return `<li class="${s ? 'done' : cur ? 'cur' : ''}"><span class="dot">${s ? '✓' : ''}</span><div><b>${esc(uname(c.id))}</b> <small>${c.step === 'review' ? L('مراجِع', 'Reviewer') : L('معتمِد', 'Approver')}</small>${s ? `<p class="hint">${L('وقّع إلكترونيًا', 'E-signed')} ${fDate(s.at)}${s.comment ? ` · ${esc(s.comment)}` : ''}</p>` : cur ? `<p class="hint">${L('بانتظار توقيعه', 'Awaiting signature')}</p>` : ''}</div></li>`; }).join('')}</ol>`
+        : `<p class="muted">${L('يعتمدها أي معتمِد مخوّل.', 'Any authorised approver can sign.')}</p>`}</div></section>` : ''}
+    ${force && p.ackRequired !== false ? `<section class="card"><div class="card-h"><div><h3>${L('الإقرار بالاطلاع', 'Read-and-sign')}</h3><p>${L(`${acked.length} من ${aud.length} من موظفي ${scopeName(p.deptId)}`, `${acked.length} of ${aud.length} staff in ${scopeName(p.deptId)}`)}${p.ackDue ? ` · ${L('المهلة', 'deadline')} ${fDate(p.ackDue)}` : ''}</p></div><strong class="${ackLate(p) ? 'c-crit' : ''}">${pct ?? '—'}%</strong></div>
+      <div class="card-b">${track(pct, ackLate(p) ? 'var(--red)' : 'var(--brand)')}${ackLate(p) ? `<p class="hint c-crit" style="margin-top:8px">${L('تجاوزت المهلة دون 100%: تُصعَّد لرؤساء الأقسام المعنية.', 'Past the deadline below 100%: escalate to the department heads concerned.')}</p>` : ''}
+      ${can('edit') ? `<details style="margin-top:10px"><summary class="muted">${L('لم يطّلعوا بعد', 'Not yet read')} (${aud.length - acked.length})</summary><p class="muted">${aud.filter(u => !(p.acks || {})[u.id]).map(u => `${esc(T(u.name))} <small>(${T(DEPTS[u.dept])})</small>`).join(lang === 'ar' ? '، ' : ', ') || '—'}</p></details>` : ''}</div></section>` : ''}
+    ${children.length ? `<section class="card"><div class="card-h"><h3>${L('النماذج والإجراءات المرتبطة', 'Linked forms & procedures')}</h3></div><div class="tbl-wrap"><table><tbody>${children.map(c => `<tr class="click" data-href="#/doc/${encodeURIComponent(c.id)}"><td class="nowrap"><span class="oid">${esc(c.code)}</span></td><td>${esc(T(c.title))}<span class="t2">${kindName(c)}${c.live ? ` · v${c.live.version}` : ''}</span></td><td>${polChip(c)}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
+    ${ed ? `<section class="card"><div class="card-h"><h3>${L('سجل الإصدارات والتوقيعات', 'Version & signature history')}</h3></div><div class="card-b">
+      ${(p.history || []).length ? `<ol class="log">${[...p.history].reverse().map(h => `<li><span class="t">${fDate(h.at)}</span><b>v${h.v}</b> · ${T(ACT_TXT[h.action] || [h.action, h.action])} · ${esc(uname(h.by))}${h.note ? ` <span class="muted">· ${esc(h.note)}</span>` : ''}</li>`).join('')}</ol>` : '—'}</div></section>` : ''}
+  </div>
+  <aside><section class="card"><div class="card-b"><dl class="meta">
+    <div><dt>${L('النوع', 'Type')}</dt><dd>${kindName(p)}</dd></div>
+    ${linked ? `<div><dt>${L('السياسة الأم', 'Parent policy')}</dt><dd><a class="ltr" href="#/doc/${encodeURIComponent(linked.id)}">${esc(linked.code)}</a><br><small>${esc(T(linked.title))}</small></dd></div>` : ''}
+    <div><dt>${L('المالك', 'Owner')}</dt><dd>${esc(uname(p.ownerId))}</dd></div>
+    <div><dt>${L('النطاق', 'Scope')}</dt><dd>${scopeName(p.deptId)}</dd></div>
+    ${p.live ? `<div><dt>${L('تاريخ السريان', 'Effective')}</dt><dd>${fDate(p.live.effectiveAt)}</dd></div><div><dt>${L('اعتمدها', 'Approved by')}</dt><dd>${esc((p.live.signers || [p.live.approvedBy]).map(uname).join(lang === 'ar' ? '، ' : ', '))}</dd></div>` : ''}
+    <div><dt>${L('المراجعة القادمة', 'Next review')}</dt><dd>${p.reviewDue ? `${fDate(p.reviewDue)}${force ? ` · <span class="due ${polOverdue(p) ? 'late' : polDueSoon(p) ? 'soon' : ''}">${rel(p.reviewDue)}</span>` : ''}` : '—'}</dd></div>
+    <div><dt>${L('أعدّ الإصدار الحالي', 'Current version prepared by')}</dt><dd>${esc(uname(p.preparedBy))}</dd></div>
+    ${(p.standards || []).length ? `<div><dt>${L('معايير CBAHI', 'CBAHI standards')}</dt><dd class="ltr">${p.standards.map(esc).join(' · ')}</dd></div>` : ''}
+  </dl></div></section></aside></div>`;
+}
+
+/* ---------- create / edit form ---------- */
+const docForm = (p = {}) => `
+  ${fSel('kind', L('نوع الوثيقة', 'Document type'), Object.entries(DOC_KIND).map(([k, v]) => [k, T(v)]), p.kind || 'policy')}
+  ${fText('code', L('رمز الوثيقة', 'Document code'), p.code || '', {req: true, ltr: true, ph: 'QPS-POL-012'})}
+  ${fText('ar', L('العنوان بالعربية', 'Title (Arabic)'), p.title ? p.title.ar : '', {req: true})}
+  ${fText('en', L('العنوان بالإنجليزية', 'Title (English)'), p.title ? p.title.en : '', {ltr: true})}
+  ${fSel('category', L('التصنيف', 'Category'), Object.entries(POL_CAT).map(([k, v]) => [k, T(v)]), p.category || 'admin')}
+  ${fSel('linkedPolicyId', L('السياسة الأم (للنماذج والإجراءات)', 'Parent policy (for forms & procedures)'), S.docs.filter(x => (x.kind || 'policy') === 'policy' && x.status !== 'archived' && x.id !== p.id).map(x => [x.id, `${x.code}: ${T(x.title)}`]), p.linkedPolicyId || '', {empty: L('بدون', 'None')})}
+  ${fSel('deptId', L('النطاق', 'Scope'), [['all', L('كل المنشأة', 'Whole facility')], ...Object.entries(DEPTS).filter(([k]) => me().role !== 'supervisor' || k === me().dept).map(([k, v]) => [k, T(v)])], p.deptId || (me().role === 'supervisor' ? me().dept : 'all'))}
+  ${fSel('ownerId', L('مالك الوثيقة', 'Document owner'), userOpts(u => u.role !== 'staff'), p.ownerId || me().id)}
+  ${fText('standards', L('معايير CBAHI المرتبطة (افصل بفاصلة)', 'Linked CBAHI standards (comma separated)'), (p.standards || []).join(', '), {ltr: true, ph: 'QM.14, IPC.3', w: true})}
+  ${fChk('ackRequired', L('يتطلب إقرار الموظفين بالاطلاع', 'Staff must read and sign'), p.ackRequired !== false)}
+  ${fArea('summary', L('الغرض والملخص', 'Purpose & summary'), p.summary ? T(p.summary) : '', {rows: 2})}`;
+function applyForm(d, p) {
+  const code = String(d.code).trim();
+  if (S.docs.some(x => x.code === code && x.id !== p.id)) throw new Error(L('رمز الوثيقة مستخدم.', 'Document code already exists.'));
+  if (['form', 'procedure'].includes(d.kind) && !d.linkedPolicyId) throw new Error(L('اربط النموذج أو الإجراء بسياسته الأم.', 'Link the form or procedure to its parent policy.'));
+  return Object.assign(p, {kind: d.kind, code, category: d.category, title: {ar: d.ar, en: d.en || d.ar}, deptId: d.deptId, ownerId: d.ownerId,
+    ackRequired: !!d.ackRequired, summary: {ar: d.summary || '', en: d.summary || ''}, linkedPolicyId: d.linkedPolicyId || null,
+    standards: String(d.standards || '').split(/[,،\s]+/).map(s => s.trim()).filter(Boolean)});
+}
+
+/* ---------- actions ---------- */
+const ACTS = {
+  tab: el => { S.tab = el.dataset.v; save(); render(); },
+  export: () => {
+    const rows = [['Code', 'Type', 'Title', 'Category', 'Scope', 'Owner', 'Live version', 'Status', 'Effective', 'Review due', 'Read %', 'Read deadline', 'Linked policy']];
+    S.docs.forEach(p => rows.push([p.code, p.kind, T(p.title), p.category, p.deptId === 'all' ? 'All' : T(DEPTS[p.deptId]), uname(p.ownerId), p.live ? p.live.version : '', p.status,
+      p.live ? toInput(p.live.effectiveAt) : '', p.reviewDue ? toInput(p.reviewDue) : '', polInForce(p) ? ackPct(p) : '', p.ackDue ? toInput(p.ackDue) : '', (getDoc(p.linkedPolicyId) || {}).code || '']));
+    const csv = '﻿' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'})); a.download = `documents-${toInput(now())}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  },
+  new: () => modal({title: L('وثيقة جديدة', 'New document'), body: docForm(), onSubmit: d => {
+    const p = applyForm(d, {id: uid('pol'), version: 1, status: 'draft', live: null, reviewDue: null, ackDue: null, preparedBy: me().id, files: [], acks: {}, history: [], reviewers: [], approvers: [], signatures: []});
+    hist(p, 'created'); S.docs.push(p); location.hash = '#/doc/' + encodeURIComponent(p.id); }}),
+  edit: el => { const p = getDoc(el.dataset.id); modal({title: L('تعديل الوثيقة', 'Edit document'), body: docForm(p), onSubmit: d => { applyForm(d, p); hist(p, 'updated'); }}); },
+  /* the author picks reviewers and approvers; all of them sign, in order */
+  submit: el => { const p = getDoc(el.dataset.id), notMe = u => u.id !== (p.preparedBy || me().id);
+    modal({title: L('إرسال للمراجعة والاعتماد', 'Send for review & approval'), sub: `${esc(p.code)} · v${p.version}`, submit: L('إرسال', 'Send'),
+      body: `${fMulti('reviewers', L('المراجِعون (يوقّعون أولًا، اختياري)', 'Reviewers (sign first, optional)'), userOpts(u => u.role !== 'staff' && notMe(u)), p.reviewers || [])}
+        ${fMulti('approvers', L('المعتمِدون (بالترتيب، واحد على الأقل)', 'Approvers (in order, at least one)'), userOpts(u => can('approve', u) && notMe(u)), (p.approvers || []).filter(id => id !== p.preparedBy))}
+        <p class="hint w">${L('لا يمكن لمُعدّ الإصدار أن يكون مراجِعًا أو معتمِدًا عليه.', 'The preparer cannot review or approve their own version.')}</p>`,
+      onSubmit: d => { const rv = [].concat(d.reviewers || []).filter(Boolean), ap = [].concat(d.approvers || []).filter(Boolean).filter(id => !rv.includes(id));
+        if (!ap.length) throw new Error(L('اختر معتمِدًا واحدًا على الأقل.', 'Choose at least one approver.'));
+        Object.assign(p, {reviewers: rv, approvers: ap, signatures: [], status: 'review', returnNote: '', preparedBy: p.preparedBy || me().id, submittedAt: iso(now())});
+        hist(p, 'submitted', [...rv, ...ap].map(uname).join(' → ')); toast(L('أُرسلت؛ أول موقّع: ', 'Sent; first signer: ') + uname((nextSigner(p) || {}).id)); }}); },
+  /* e-signature: replace the confirmation checkbox with a real password / OTP check against your auth */
+  sign: el => { const p = getDoc(el.dataset.id), n = nextSigner(p); if (!canSign(p)) return toast(L('ليس دورك في التوقيع.', 'It is not your turn to sign.'), 'err');
+    const last = chainOf(p).filter(c => !(p.signatures || []).some(s => s.userId === c.id && s.decision !== 'reject')).length <= 1;
+    modal({title: n.step === 'review' ? L('توقيع المراجعة', 'Sign review') : L('اعتماد بتوقيع إلكتروني', 'Approve with e-signature'), sub: `${esc(p.code)} · v${p.version}`, submit: L('توقيع', 'Sign'),
+      body: `${fArea('comment', L('تعليق (اختياري)', 'Comment (optional)'), '', {rows: 2})}
+        ${last && n.step === 'approve' ? `${fText('eff', L('تاريخ السريان', 'Effective date'), toInput(now()), {type: 'date', req: true})}${fText('years', L('المراجعة بعد (سنوات)', 'Review after (years)'), CFG.reviewYears, {type: 'number', req: true, attrs: 'min="1" max="5"'})}
+          <p class="hint w">${L('أنت آخر معتمِد: تُنشر الوثيقة، ويُعاد ضبط الإقرار بالاطلاع، وتبدأ مهلة الاطلاع.', 'You are the last approver: the document is published, read-and-sign resets and its deadline starts.')}</p>` : ''}
+        ${fChk('confirm', L(`أوقّع إلكترونيًا بصفتي ${uname(me().id)}`, `I e-sign as ${uname(me().id)}`), false, {req: true})}`,
+      onSubmit: d => {
+        (p.signatures = p.signatures || []).push({userId: me().id, step: n.step, decision: n.step === 'review' ? 'reviewed' : 'approve', comment: d.comment || '', at: iso(now())});
+        hist(p, n.step === 'review' ? 'signed_review' : 'signed', d.comment || '');
+        if (!nextSigner(p)) { const eff = d.eff ? new Date(d.eff + 'T00:00:00') : now(), due = new Date(eff); due.setFullYear(due.getFullYear() + Math.max(1, +d.years || CFG.reviewYears));
+          p.live = {version: p.version, effectiveAt: iso(eff), approvedBy: me().id, approvedAt: iso(now()), signers: p.signatures.filter(s => s.decision !== 'reject').map(s => s.userId)};
+          Object.assign(p, {status: 'approved', reviewDue: iso(due), acks: {}, ackDue: iso(addDays(eff, CFG.ackDays))}); hist(p, 'approved');
+          return toast(L('اكتملت التوقيعات ونُشرت الوثيقة', 'All signatures complete; document published')); }
+        toast(L('سُجّل توقيعك؛ التالي: ', 'Signed; next: ') + uname(nextSigner(p).id)); }}); },
+  return: el => { const p = getDoc(el.dataset.id); modal({title: L('رفض وإعادة للمُعد', 'Reject and return to author'), danger: true, submit: L('رفض', 'Reject'),
+    body: fArea('note', L('ما المطلوب تعديله؟', 'What needs to change?'), '', {req: true}),
+    onSubmit: d => { Object.assign(p, {status: 'draft', returnNote: d.note, signatures: []}); hist(p, 'returned', d.note); }}); },
+  revise: el => { const p = getDoc(el.dataset.id); p.version = (p.live ? p.live.version : p.version) + 1; Object.assign(p, {status: 'draft', preparedBy: me().id, signatures: []}); hist(p, 'revision'); save(); render();
+    toast(L('بدأت المراجعة؛ الإصدار الحالي يبقى ساريًا حتى اعتماد الجديد', 'Revision started; the current version stays in force until the new one is approved')); },
+  reviewed: el => { const p = getDoc(el.dataset.id); modal({title: L('تأكيد المراجعة دون تعديل', 'Confirm review with no change'), sub: esc(T(p.title)), submit: L('تأكيد', 'Confirm'),
+    body: fArea('note', L('ملخص المراجعة', 'Review summary'), '', {req: true, rows: 2, ph: L('مثال: رُوجعت مع اللجنة ولا تزال مطابقة للممارسة والمعايير', 'e.g. reviewed with the committee; still matches practice and standards')}),
+    onSubmit: d => { const due = now(); due.setFullYear(due.getFullYear() + CFG.reviewYears); p.reviewDue = iso(due); hist(p, 'reviewed', d.note); toast(L('سُجّلت المراجعة ومُدّد موعد المراجعة القادمة', 'Review logged; next review date extended')); }}); },
+  archive: el => { const p = getDoc(el.dataset.id); modal({title: L('إيقاف العمل بهذه الوثيقة؟', 'Retire this document?'), sub: L('ستختفي عن الموظفين تلقائيًا.', 'It disappears for staff automatically.'), body: '', danger: true, submit: L('إيقاف', 'Retire'),
+    onSubmit: () => { p.status = 'archived'; hist(p, 'archived'); }}); },
+  ack: el => { const p = getDoc(el.dataset.id); p.acks = Object.assign({}, p.acks, {[me().id]: iso(now())}); save(); render(); toast(L('سُجّل إقرارك بالاطلاع', 'Read-and-sign recorded')); }
+};
+
+/* ---------- render + wiring ---------- */
+function render() {
+  document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  $('#today').textContent = now().toLocaleDateString(lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+  $('#langBtn').textContent = lang === 'ar' ? 'English' : 'العربية';
+  $('#whoLbl').textContent = L('المستخدم الحالي', 'Current user');
+  $('#who').innerHTML = USERS.map(u => `<option value="${u.id}" ${u.id === me().id ? 'selected' : ''}>${esc(T(u.name))} · ${T(ROLES[u.role])}</option>`).join('');
+  const m = location.hash.match(/^#\/doc\/(.+)$/);
+  $('#app').innerHTML = m ? detailView(decodeURIComponent(m[1])) : listView();
+  const ks = $('#kindSel'); if (ks) ks.onchange = () => { S.kind = ks.value; save(); render(); };
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (a && ACTS[a.dataset.act]) { e.preventDefault(); return ACTS[a.dataset.act](a); }
+  const r = e.target.closest('tr[data-href]'); if (r && !e.target.closest('a')) location.hash = r.dataset.href;
+});
+$('#langBtn').onclick = () => { lang = lang === 'ar' ? 'en' : 'ar'; store.set(KEY + ':lang', lang); render(); };
+$('#who').onchange = e => { S.me = e.target.value; save(); render(); };
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>
